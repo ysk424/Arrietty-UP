@@ -1,5 +1,8 @@
 # Arrietty-UP
 
+The current session handoff and next starting point are recorded in
+[`NEXT_SESSION.md`](NEXT_SESSION.md).
+
 Arrietty-UP is the in-progress UPBGE port of `../Arrietty-UE`. Its target
 surface is the bicycle, human-powered flight, OpenXR, CYCPLUS T2, VIVE
 steering, wired ESP32 control panel, ESP32 fan, instrument, ride log, and
