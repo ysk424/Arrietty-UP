@@ -25,11 +25,12 @@ streaming belongs to `../Secret-World`.
 
 ## Current milestone
 
-The locally built UPBGE 0.53/OpenXR path has been verified in an HMD. Starting
-the game with `P`, keeping the XR image alive, and returning with `Esc` works
-after restoring the View3D context following XR notifier handling in the local
-UPBGE source tree. T2 speed-driven OpenXR navigation, Garmin heart rate, the
-wired controller, and speed-driven fan levels have also passed a live run.
+The locally built UPBGE 0.53/OpenXR path has been verified in an HMD. The
+`tools/launch_openxr_game.py` startup helper starts persistent OpenXR before
+entering the game once; returning with `Esc` works after restoring the View3D
+context following XR notifier handling in the local UPBGE source tree. T2
+speed-driven OpenXR navigation, Garmin heart rate, the wired controller, and
+speed-driven fan levels have also passed a live run.
 
 The game begins preparing and maintaining T2 as soon as its first UPBGE frame
 runs; Button 1 aligns the HMD and centered VIVE handle, then arms movement.
@@ -46,11 +47,11 @@ active. Runtime properties expose `gatt_connected_after_seconds`,
 ## Port status
 
 Live verified: persistent OpenXR game entry/exit, T2 FTMS ground movement,
-Garmin heart rate, wired Button 1, speed-driven fan output, forward-axis OpenXR
-navigation, and the adjusted instrument-panel placement. Implemented and unit
-tested but awaiting the next live run: direct-address/early T2 setup and its
-timings, two-meter safety return, fixed-serial VIVE steering, HMD alignment,
-the complete wired flight controls, flight runtime, and Button 5 voice PTT.
+Garmin heart rate, wired controls, speed-driven fan output, forward-axis OpenXR
+navigation, HMD/VIVE alignment, adjusted instrument-panel placement, and
+human-powered takeoff and turning. The morning 2026-09-03 flight used the
+right-side physics values as its reliable attitude reference because the PFD
+presentation did not consistently match the physical flight state.
 
 Ride CSV, course-surface collision, resistance-preset selection, and VR alerts
 remain to be integrated. This list describes the implementation state; the
@@ -83,6 +84,11 @@ heart rate and T2 power prominently, plus bicycle ground speed, applied T2
 grade, and mode. The center is a PFD with vertical airspeed and altitude tapes;
 its artificial horizon and pitch ladder bank together. The right section shows
 flight/physical values and runtime diagnostics.
+
+Known working-baseline issue: pitching up can translate the earth/sky geometry
+outside the PFD's circular bezel. The horizon needs a true circular clip/mask
+or equivalent contained geometry, and its pitch/bank mapping needs to be
+checked against the right-side physical values before the PFD is relied upon.
 
 Placement and viewing tilt are live custom-property controls on
 `InstrumentPanelRoot`: `panel_forward_m`, `panel_center_height_m`, and

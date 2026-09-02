@@ -24,6 +24,8 @@ class InstrumentReadout:
     airspeed_ticks: tuple[str, str, str, str]
     altitude: str
     altitude_ticks: tuple[str, str, str, str]
+    pfd_status: str
+    pfd_state: str
     physics: str
     debug: str
 
@@ -34,6 +36,18 @@ def _mode(runtime) -> str:
     if runtime.ride_active:
         return "RIDE"
     return "STANDBY"
+
+
+def _pfd_status(runtime) -> str:
+    if runtime.flight.stalled:
+        return "PFD / STALL - NOSE DOWN"
+    if runtime.flight.airborne:
+        return "PFD / AIRBORNE"
+    if runtime.flight_enabled:
+        return "PFD / TAKEOFF ARMED - PITCH UP"
+    if runtime.ride_active:
+        return "PFD / GROUND"
+    return "PRIMARY FLIGHT DISPLAY"
 
 
 def _tape_ticks(value: float, step: float, *, decimals: int = 0) -> tuple[str, ...]:
@@ -63,6 +77,10 @@ def build_readout(runtime, delta_seconds: float) -> InstrumentReadout:
     tuning_status = runtime.tuning_controls.compact_status()
     if runtime.tuning_controls.active:
         tuning_status = tuning_status.replace("TUNE ", "T", 1)
+    pfd_state = (
+        f"P {flight.pitch_degrees:+.1f}  B {flight.bank_degrees:+.1f}  "
+        f"ALT {altitude_meters:.1f} m"
+    )
     physics = "\n".join(
         (
             f"V/S    {flight.vertical_speed_meters_per_second:+5.1f} m/s",
@@ -93,8 +111,14 @@ def build_readout(runtime, delta_seconds: float) -> InstrumentReadout:
         mode=_mode(runtime),
         airspeed=f"{airspeed_kmh:.0f}",
         airspeed_ticks=_tape_ticks(airspeed_kmh, 10.0),
-        altitude=f"{altitude_meters:.0f}",
+        altitude=(
+            f"{altitude_meters:.1f}"
+            if altitude_meters < 100.0
+            else f"{altitude_meters:.0f}"
+        ),
         altitude_ticks=_tape_ticks(altitude_meters, 50.0),
+        pfd_status=_pfd_status(runtime),
+        pfd_state=pfd_state,
         physics=physics,
         debug=debug,
     )
@@ -145,6 +169,8 @@ def update_upbge_panel(scene, runtime, delta_seconds: float) -> None:
         "Instrument_ModeValue": readout.mode,
         "Instrument_AirspeedValue": readout.airspeed,
         "Instrument_AltitudeValue": readout.altitude,
+        "Instrument_PFDHeading": readout.pfd_status,
+        "Instrument_PFDState": readout.pfd_state,
         "Instrument_PhysicsText": readout.physics,
         "Instrument_DebugText": readout.debug,
     }
@@ -160,19 +186,24 @@ def update_upbge_panel(scene, runtime, delta_seconds: float) -> None:
     if horizon is not None:
         from mathutils import Matrix
 
-        _, _, rotation = attitude_transform(
+        shift_x, shift_z, rotation = attitude_transform(
             runtime.flight.pitch_degrees,
             runtime.flight.bank_degrees,
         )
-        horizon.localPosition = (0.0, horizon.get("panel_base_y", 0.018), 0.0)
+        # Move the ground/sky boundary and pitch ladder as one rigid group.
+        # The translation is rotated into the banked display axes.
+        horizon.localPosition = (
+            shift_x,
+            horizon.get("panel_base_y", 0.018),
+            shift_z,
+        )
         horizon.localOrientation = Matrix.Rotation(
             math.radians(rotation), 3, "Y"
         )
         ladder = _scene_object(scene, "Instrument_PFD_Ladder")
         if ladder is not None:
-            pitch = max(-30.0, min(30.0, runtime.flight.pitch_degrees))
             ladder.localPosition = (
                 0.0,
                 ladder.get("panel_base_y", 0.005),
-                -pitch * PITCH_METERS_PER_DEGREE,
+                0.0,
             )

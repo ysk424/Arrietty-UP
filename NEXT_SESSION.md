@@ -2,9 +2,10 @@
 
 Last updated: 2026-09-03 (Asia/Tokyo)
 
-The panel was implemented and its placement accepted during the morning. The
-wired controls, VIVE steering, HMD alignment, voice PTT client, and flight loop
-are now implemented for the next live hardware/OpenXR run.
+The panel placement and human-powered flight controls were accepted in live
+OpenXR tests. The morning 2026-09-03 run achieved takeoff and controlled turns.
+The current build is a working baseline, but the PFD attitude presentation
+still needs correction as described below.
 
 ## Next live test
 
@@ -17,11 +18,17 @@ degrees while retaining the 1.0 m center height. Its right-side debug block was
 expanded to show steering, flight commands, tuning, and voice status. Confirm
 that those small dynamic values remain readable in both eyes.
 
-There are no numeric-keypad runtime controls. With the HMD facing the physical
-bicycle direction and the handle centered, press `P` to enter the game and use
-Button 1 to align/start. Verify fixed-serial VIVE steering, then Button 2,
-Joystick 2, Buttons 3+4, Joystick 1 tuning, Button 5 PTT, Button 6 brake, flight
-takeoff/turn/stall recovery/landing, and the second-Button-1 safety return.
+There are no numeric-keypad runtime controls. Start with
+`tools/launch_openxr_game.py` as shown below. With the HMD facing the physical
+bicycle direction and the handle centered, use Button 1 to align/start.
+
+The next instrument task is to redesign the PFD horizon presentation. During
+pitch-up, the moving earth/sky geometry can leave the outer circular bezel,
+revealing that the horizon is a translated object rather than a correctly
+clipped circular display. The PFD attitude also did not consistently match the
+physical flight state. The right-side pitch, bank, and other physics values did
+track well enough to take off and turn, so preserve those as the diagnostic
+reference while correcting the PFD mask/geometry and attitude mapping.
 
 Terrain may also be prepared as a visual reference, but its authoring source
 should remain in Blender 5.2 LTS. Make a separate copy before opening or saving
@@ -42,19 +49,31 @@ scope here.
 - Standard Blender MCP: `127.0.0.1:9876`
 - UPBGE MCP: `127.0.0.1:9877`
 
-Launch the UPBGE project from PowerShell with:
+Launch OpenXR and enter the UPBGE game once from PowerShell with:
 
 ```powershell
-& "C:\Users\azoo\git\build_upbge_windows_Release_x64_vc17_Release\bin\blender.exe" --online-mode "C:\Users\azoo\git\Arrietty-UP\Arrietty-UP.blend"
+& "C:\Users\azoo\git\build_upbge_windows_Release_x64_vc17_Release\bin\blender.exe" `
+  --online-mode --start-console `
+  "C:\Users\azoo\git\Arrietty-UP\Arrietty-UP.blend" `
+  --python "C:\Users\azoo\git\Arrietty-UP\tools\launch_openxr_game.py"
 ```
 
-`P` starts the UPBGE game. `Esc` leaves the game. A darker rectangular game
-border while running is expected. The OpenXR image should remain present in
-the HMD across both operations.
+The launcher starts the persistent OpenXR session before entering the game, so
+no `P` press is required. `Esc` leaves the game. A darker rectangular game
+border while running is expected.
 
 ## Live hardware result
 
-The final integrated hardware run on 2026-09-02 was accepted as **PASS**.
+The morning flight run on 2026-09-03 was accepted as a **working baseline with
+the known PFD issue above**.
+
+- OpenXR appeared in the HMD and the game entered exactly once.
+- CYCPLUS T2 and the wired controller connected; the last controller port was
+  `COM7` at 115200 bps.
+- Human-powered takeoff and controlled turns were achieved.
+- Right-side physics/debug values reflected the flight well enough to operate.
+
+The integrated hardware run on 2026-09-02 was also accepted as **PASS**.
 
 - OpenXR remained displayed while entering and leaving the UPBGE game.
 - CYCPLUS T2 speed data produced ground movement in the HMD.
@@ -110,11 +129,10 @@ Run Blender-independent tests with:
 python3 -m unittest discover -s tests -v
 ```
 
-The current baseline has 55 passing tests, including panel formatting, PFD
+The current baseline has 57 passing tests, including panel formatting, PFD
 attitude transforms, button chord handling, VIVE steering math, voice protocol,
 HMD alignment math, and the connected flight runtime. Remaining integrations
-include ride CSV, course-surface collision, resistance-preset selection, and VR
-alerts. The new controls and flight loop still require the live test described
-above.
+include the PFD corrections described above, ride CSV, course-surface collision,
+resistance-preset selection, and VR alerts.
 
 Preserve unrelated user work in `../Arrietty` and `../Secret-World`.

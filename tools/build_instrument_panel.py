@@ -139,7 +139,11 @@ def _text(
     obj.data.materials.append(material)
     bpy.context.view_layer.objects.active = obj
     bpy.ops.object.game_property_new(type="STRING", name="Text")
-    obj.game.properties[-1].value = body
+    # UPBGE's BL_ConvertProperties passes a string property's internal pointer
+    # directly to strlen(). A newly-created empty RNA string may retain a null
+    # pointer, so keep authored blank labels non-empty until the runtime owns
+    # and updates the converted property.
+    obj.game.properties[-1].value = body if body else " "
     return obj
 
 
@@ -206,6 +210,15 @@ def _build_left(panel, white, cyan, red, amber):
 
 def _build_pfd(panel, black, dark, white, sky, ground, cyan, amber, magenta):
     _text("Instrument_PFDHeading", panel, "PRIMARY FLIGHT DISPLAY", (0.0, 0.030, 0.166), 0.015, cyan, align="CENTER")
+    _text(
+        "Instrument_PFDState",
+        panel,
+        "P +0.0  B +0.0  ALT 0.0 m",
+        (0.0, 0.030, -0.164),
+        0.012,
+        amber,
+        align="CENTER",
+    )
 
     # Vertical airspeed and altitude tapes.
     for name, x, label in (("Airspeed", 0.195, "AIR km/h"), ("Altitude", -0.195, "ALT m")):
