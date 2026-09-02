@@ -16,6 +16,7 @@ from .controls import DigitalFlightControls, FlightTuningControls
 from .controller_protocol import ButtonEdgeLatch
 from .flight import initialize_human_powered_flight
 from .fan import FanController
+from .instruments import update_upbge_panel
 from .models import CscSample, FlightState
 from .serial_controller import ControllerEventType, SerialController
 from .trainer_protocol import effective_speed_kmh
@@ -625,6 +626,7 @@ def tick(controller) -> None:
 
     owner["arrietty_frames"] = runtime.frame_count
     owner["arrietty_delta_ms"] = round(delta * 1000.0, 3)
+    update_upbge_panel(bge.logic.getCurrentScene(), runtime, delta)
 
     # The scene disables UPBGE's immediate exit key so worker threads can stop
     # before the engine tears down the Python runtime.

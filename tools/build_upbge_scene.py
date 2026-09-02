@@ -6,6 +6,7 @@ Run through ``tools/mcp_client.py --file``. This is authoring code, so using
 
 import math
 from pathlib import Path
+import sys
 
 import bpy
 from mathutils import Vector
@@ -107,6 +108,13 @@ camera.data.clip_end = 5000.0
 look_at(camera, (0.0, -8.0, 1.5))
 camera.parent = root
 scene.camera = camera
+
+# Keep a full scene rebuild and the incremental panel builder in sync.
+if str(OUTPUT.parent) not in sys.path:
+    sys.path.insert(0, str(OUTPUT.parent))
+from tools.build_instrument_panel import build_panel
+
+build_panel(scene)
 
 bpy.ops.object.light_add(type="SUN", location=(0.0, 0.0, 20.0))
 sun = bpy.context.object

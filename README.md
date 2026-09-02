@@ -52,10 +52,33 @@ early T2/Garmin preparation, direct-address T2 connection, speed-first GATT
 setup, connection phase timings, and the two-meter safety return.
 
 The flight physics and digital/tuning control calculations are unit tested but
-not yet connected to the UPBGE game loop. VIVE steering, the VR instrument,
-ride CSV, voice PTT, course-surface collision, presets, and VR alerts remain to
-be integrated. This list describes the implementation state; the target
-feature list above is not a claim that those items are already complete.
+not yet connected to the UPBGE game loop. The VR instrument-panel prototype is
+authored and runtime-wired but awaits its HMD fit/readability test. VIVE
+steering, flight runtime, ride CSV, voice PTT, course-surface collision,
+presets, and VR alerts remain to be integrated. This list describes the
+implementation state; the target feature list above is not a claim that those
+items are already complete.
+
+## Instrument panel prototype
+
+The three-section instrument panel is fixed to `ArriettyRuntime` (the bicycle
+reference), centered 1.3 m forward at a height of 1.0 m and tilted upward
+46.565 degrees. Its left section shows
+heart rate and T2 power prominently, plus bicycle ground speed, applied T2
+grade, and mode. The center is a PFD with vertical airspeed and altitude tapes;
+its artificial horizon and pitch ladder bank together. The right section shows
+flight/physical values and runtime diagnostics.
+
+Placement and viewing tilt are live custom-property controls on
+`InstrumentPanelRoot`: `panel_forward_m`, `panel_center_height_m`, and
+`panel_tilt_degrees`. Rebuild just the panel in an open or background UPBGE
+scene with:
+
+```powershell
+& "C:\Users\azoo\git\build_upbge_windows_Release_x64_vc17_Release\bin\blender.exe" `
+  --background "C:\Users\azoo\git\Arrietty-UP\Arrietty-UP.blend" `
+  --python "C:\Users\azoo\git\Arrietty-UP\tools\build_instrument_panel.py"
+```
 
 Run Blender-independent tests with:
 

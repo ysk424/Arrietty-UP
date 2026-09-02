@@ -1,15 +1,21 @@
 # Next session handoff
 
-Last updated: 2026-09-02 (Asia/Tokyo)
+Last updated: 2026-09-03 (Asia/Tokyo)
 
-## Start here tomorrow
+The panel was implemented during the morning. A long live hardware/OpenXR test
+window is expected after work this evening, as on 2026-09-02.
+
+## Next live test
 
 Work from `C:\Users\azoo\git\Arrietty-UP`.
 
-The next objective is the VR instrument panel. First review the user's proposed
-appearance and decide what information must remain readable in the HMD. Then
-build the smallest panel prototype in a copy of the UPBGE scene and test its
-placement, scale, contrast, and readability in OpenXR.
+The first VR instrument-panel prototype is now authored in the UPBGE scene.
+Its Blender render and Blender-independent display tests pass, but it still
+needs completion of its OpenXR/HMD fit test. The first live adjustment moved it
+from 1.0 m to 1.3 m forward and increased its upward tilt from 26.565 to 46.565
+degrees while retaining the 1.0 m center height. Confirm that the small
+right-side debug text remains readable in both eyes and that dynamic values
+update while T2, Garmin, and the fan are active.
 
 Terrain may also be prepared as a visual reference, but its authoring source
 should remain in Blender 5.2 LTS. Make a separate copy before opening or saving
@@ -100,10 +106,10 @@ Run Blender-independent tests with:
 python3 -m unittest discover -s tests -v
 ```
 
-The accepted baseline had 38 passing tests. Flight physics and digital/tuning
-controls are unit tested but are not yet connected to the UPBGE game loop.
-After the instrument panel, remaining integrations include VIVE steering,
-flight runtime, ride CSV, voice PTT, course-surface collision, presets, and VR
-alerts.
+The current baseline has 43 passing tests, including panel formatting and PFD
+attitude-transform tests. Flight physics and digital/tuning controls are unit
+tested but are not yet connected to the UPBGE game loop. Remaining integrations
+include VIVE steering, flight runtime, ride CSV, voice PTT, course-surface
+collision, presets, and VR alerts.
 
 Preserve unrelated user work in `../Arrietty` and `../Secret-World`.
