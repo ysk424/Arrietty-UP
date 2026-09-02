@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+.venv/
+build/
+dist/
+vendor/
+.runtime/
+*.blend1
+*.blend2
+*.crash.txt
+logs/
+Saved/

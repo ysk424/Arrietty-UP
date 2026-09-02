@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "arrietty-up"
+version = "0.1.0"
+description = "UPBGE runtime port of Arrietty-UE without Cesium"
+requires-python = ">=3.11"
+license = {file = "LICENSE"}
+
+[tool.setuptools.packages.find]
+include = ["arrietty_up*"]
