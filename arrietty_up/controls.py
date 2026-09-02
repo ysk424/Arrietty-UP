@@ -82,6 +82,64 @@ class DigitalFlightControls:
         return (1 if value > 0.0 else -1), False
 
 
+@dataclass(frozen=True, slots=True)
+class FlightButtonAction:
+    pitch_step: int = 0
+    roll_right_step: int = 0
+
+
+class FlightButtonChord:
+    """Resolve Button 3/4 singles versus the 80 ms pitch-up chord."""
+
+    def __init__(self, window_seconds: float = 0.080) -> None:
+        self.window_seconds = window_seconds
+        self.pending_roll_right_step = 0
+        self.pending_since_seconds = 0.0
+
+    def reset(self) -> None:
+        self.pending_roll_right_step = 0
+        self.pending_since_seconds = 0.0
+
+    def flush(self, now_seconds: float) -> FlightButtonAction | None:
+        if (
+            self.pending_roll_right_step == 0
+            or now_seconds - self.pending_since_seconds < self.window_seconds
+        ):
+            return None
+        action = FlightButtonAction(
+            roll_right_step=self.pending_roll_right_step
+        )
+        self.pending_roll_right_step = 0
+        return action
+
+    def update(
+        self,
+        pressed_edges: int,
+        current_buttons: int,
+        now_seconds: float,
+    ) -> tuple[FlightButtonAction, ...]:
+        actions: list[FlightButtonAction] = []
+        expired = self.flush(now_seconds)
+        if expired is not None:
+            actions.append(expired)
+        left_edge = bool(pressed_edges & 0x04)
+        right_edge = bool(pressed_edges & 0x08)
+        if not left_edge and not right_edge:
+            return tuple(actions)
+        both_held = current_buttons & 0x0C == 0x0C
+        if (left_edge and right_edge) or (
+            both_held
+            and self.pending_roll_right_step != 0
+            and now_seconds - self.pending_since_seconds <= self.window_seconds
+        ):
+            self.pending_roll_right_step = 0
+            actions.append(FlightButtonAction(pitch_step=1))
+            return tuple(actions)
+        self.pending_roll_right_step = -1 if left_edge else 1
+        self.pending_since_seconds = now_seconds
+        return tuple(actions)
+
+
 class TuningParameter(IntEnum):
     TEST_PROPULSION_POWER = 0
     POSITIVE_CLIMB_MULTIPLIER = 1
@@ -168,3 +226,16 @@ class FlightTuningControls:
             c.FLIGHT_MAX_BANK_RATE_TUNING_DEGREES_PER_SECOND,
         )
         return before != values.bank_rate_degrees_per_second
+
+    def compact_status(self) -> str:
+        if not self.active:
+            return "TUNE OFF"
+        labels = ("TEST PROP", "POWER BOOST", "PITCH RATE", "ROLL RATE")
+        value = self.values
+        formatted = (
+            f"{value.test_propulsion_power_watts:.0f} W",
+            f"x{value.positive_climb_multiplier:.0f}",
+            f"{value.pitch_rate_degrees_per_second:.0f} DEG/S",
+            f"{value.bank_rate_degrees_per_second:.0f} DEG/S",
+        )[int(self.parameter)]
+        return f"TUNE {int(self.parameter) + 1}/4 {labels[int(self.parameter)]} {formatted}"

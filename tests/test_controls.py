@@ -1,7 +1,12 @@
 import unittest
 
 from arrietty_up import constants as c
-from arrietty_up.controls import DigitalFlightControls, FlightTuningControls, TuningParameter
+from arrietty_up.controls import (
+    DigitalFlightControls,
+    FlightButtonChord,
+    FlightTuningControls,
+    TuningParameter,
+)
 
 
 class DigitalControlsTests(unittest.TestCase):
@@ -56,6 +61,22 @@ class TuningControlsTests(unittest.TestCase):
         controls.press_switch()
         self.assertTrue(controls.press_switch().completed)
         self.assertFalse(controls.active)
+
+
+class FlightButtonChordTests(unittest.TestCase):
+    def test_single_buttons_are_delayed_then_resolved_as_roll(self):
+        chord = FlightButtonChord()
+        self.assertEqual(chord.update(0x04, 0x04, 1.0), ())
+        action = chord.flush(1.081)
+        self.assertEqual(action.roll_right_step, -1)
+
+    def test_two_buttons_within_window_resolve_as_pitch(self):
+        chord = FlightButtonChord()
+        chord.update(0x04, 0x04, 1.0)
+        actions = chord.update(0x08, 0x0C, 1.05)
+        self.assertEqual(len(actions), 1)
+        self.assertEqual(actions[0].pitch_step, 1)
+        self.assertIsNone(chord.flush(2.0))
 
 
 if __name__ == "__main__":

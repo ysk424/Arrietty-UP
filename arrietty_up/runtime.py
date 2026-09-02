@@ -12,14 +12,21 @@ import time
 
 from . import constants as c
 from .bluetooth import BluetoothEvent, BluetoothEventType, BluetoothManager
-from .controls import DigitalFlightControls, FlightTuningControls
-from .controller_protocol import ButtonEdgeLatch
-from .flight import initialize_human_powered_flight
+from .controls import (
+    DigitalFlightControls,
+    FlightButtonAction,
+    FlightButtonChord,
+    FlightTuningControls,
+)
+from .controller_protocol import ButtonEdgeLatch, ButtonTransition, ControllerSample
+from .flight import initialize_human_powered_flight, step_human_powered_flight
 from .fan import FanController
 from .instruments import update_upbge_panel
 from .models import CscSample, FlightState
 from .serial_controller import ControllerEventType, SerialController
+from .steering import SteeringController
 from .trainer_protocol import effective_speed_kmh
+from .voice import VoiceBridge
 
 
 @dataclass(slots=True)
@@ -30,15 +37,20 @@ class RuntimeState:
     flight_enabled: bool = False
     flight: FlightState = field(default_factory=initialize_human_powered_flight)
     digital_controls: DigitalFlightControls = field(default_factory=DigitalFlightControls)
+    flight_button_chord: FlightButtonChord = field(default_factory=FlightButtonChord)
     tuning_controls: FlightTuningControls = field(default_factory=FlightTuningControls)
     serial: SerialController = field(default_factory=SerialController)
     bluetooth: BluetoothManager = field(default_factory=BluetoothManager)
+    steering: SteeringController = field(default_factory=SteeringController)
     fan: FanController = field(default_factory=FanController)
+    voice: VoiceBridge = field(default_factory=VoiceBridge)
     button_edges: ButtonEdgeLatch = field(default_factory=ButtonEdgeLatch)
     button_history: list[str] = field(default_factory=list)
     controller_sample_count: int = 0
     controller_nonzero_samples: int = 0
     controller_button_mask: int = 0
+    joystick1_axes: tuple[float, float] = (0.0, 0.0)
+    joystick2_axes: tuple[float, float] = (0.0, 0.0)
     ride_active: bool = False
     connection_started_at_seconds: float = 0.0
     ride_started_at_seconds: float = 0.0
@@ -60,6 +72,10 @@ class RuntimeState:
     position_x_meters: float = 0.0
     position_y_meters: float = 0.0
     heading_degrees: float = 0.0
+    steering_tracking: bool = False
+    steering_status: str = "IDLE"
+    steering_message: str = "VIVE steering is stopped"
+    raw_steering_degrees: float = 0.0
     effective_steering_degrees: float = 0.0
     distance_meters: float = 0.0
     laps_completed: int = 0
@@ -70,7 +86,16 @@ class RuntimeState:
     last_recovery_sample_meters: float = 0.0
     last_recovered_meters: float = 0.0
     last_start_action: str = "IDLE"
+    hmd_aligned: bool = False
+    hmd_alignment_degrees: float = 0.0
+    hmd_alignment_pending_until_seconds: float = 0.0
+    hmd_alignment_message: str = "WAITING FOR BUTTON 1"
+    last_mode_action: str = "GROUND"
+    last_flight_event: str = ""
+    last_control_message: str = ""
+    propulsion_power_watts: float = 0.0
     speed_kmh: float = 0.0
+    ground_speed_kmh: float = 0.0
     ftms_speed_kmh: float = 0.0
     cadence_rpm: float = 0.0
     power_watts: int = 0
@@ -83,6 +108,8 @@ class RuntimeState:
     heart_rate_bpm: int | None = None
     heart_rate_status: str = "DISCONNECTED"
     last_heart_rate_sample_seconds: float = 0.0
+    ptt_held: bool = False
+    voice_status: str = "IDLE"
     ending: bool = False
 
     def prepare_devices(self) -> bool:
@@ -91,6 +118,7 @@ class RuntimeState:
             return False
 
         self.speed_kmh = 0.0
+        self.ground_speed_kmh = 0.0
         self.ftms_speed_kmh = 0.0
         self.cadence_rpm = 0.0
         self.power_watts = 0
@@ -126,7 +154,19 @@ class RuntimeState:
             self.last_start_action = "SAFETY_RETURN"
             return False
         self.prepare_devices()
+        self.flight_enabled = False
+        self.flight = initialize_human_powered_flight()
+        self.digital_controls.reset(self.joystick2_axes)
+        self.flight_button_chord.reset()
+        self.tuning_controls.reset(self.joystick1_axes)
+        self.propulsion_power_watts = 0.0
+        self.steering.recenter()
         self.ride_started_at_seconds = time.monotonic()
+        self.hmd_aligned = False
+        self.hmd_alignment_pending_until_seconds = (
+            self.ride_started_at_seconds + 1.0
+        )
+        self.hmd_alignment_message = "ALIGNING HMD TO BICYCLE FORWARD"
         self.first_motion_after_seconds = 0.0
         if self.brake_button_held and self.bluetooth.running:
             self.bluetooth.request_grade(c.BRAKE_GRADE_PERCENT)
@@ -135,6 +175,95 @@ class RuntimeState:
         self.last_start_action = "STARTED"
         self.ride_active = True
         return True
+
+    def toggle_flight(self) -> bool:
+        if not self.ride_active:
+            self.last_mode_action = "START RIDE BEFORE FLIGHT"
+            return False
+        if self.flight_enabled:
+            if self.flight.airborne or self.flight.altitude_meters > 0.05:
+                self.last_mode_action = "LAND BEFORE GROUND MODE"
+                return False
+            self.flight_enabled = False
+            self.flight = initialize_human_powered_flight()
+            self.digital_controls.reset(self.joystick2_axes)
+            self.flight_button_chord.reset()
+            self.tuning_controls.reset(self.joystick1_axes)
+            self.propulsion_power_watts = 0.0
+            self.last_mode_action = "GROUND"
+            return True
+        self.flight_enabled = True
+        self.flight = initialize_human_powered_flight(self.ground_speed_kmh)
+        self.digital_controls.reset(self.joystick2_axes)
+        self.flight_button_chord.reset()
+        self.tuning_controls.reset(self.joystick1_axes)
+        self.last_mode_action = "FLIGHT"
+        return True
+
+    def _apply_flight_button_action(self, action: FlightButtonAction) -> None:
+        if action.pitch_step:
+            self.digital_controls.step_pitch(action.pitch_step)
+            self.last_control_message = "BUTTON 3+4 PITCH UP"
+        if action.roll_right_step:
+            self.digital_controls.step_roll_right(action.roll_right_step)
+            self.last_control_message = (
+                "BUTTON 4 ROLL RIGHT"
+                if action.roll_right_step > 0
+                else "BUTTON 3 ROLL LEFT"
+            )
+
+    def flush_flight_button(self, now_seconds: float) -> None:
+        action = self.flight_button_chord.flush(now_seconds)
+        if action is not None and self.flight_enabled:
+            self._apply_flight_button_action(action)
+
+    def handle_controller_input(
+        self,
+        sample: ControllerSample,
+        transition: ButtonTransition | None,
+        now_seconds: float,
+    ) -> None:
+        self.controller_button_mask = sample.button_mask
+        self.joystick1_axes = sample.joystick1
+        self.joystick2_axes = sample.joystick2
+        self.set_brake_button_held(bool(sample.button_mask & 0x20))
+        pressed = 0 if transition is None else transition.pressed
+        changed = 0 if transition is None else transition.pressed | transition.released
+
+        if pressed & 0x02:
+            self.toggle_flight()
+        current_ptt = bool(sample.button_mask & 0x10)
+        if changed & 0x10 or self.ptt_held != current_ptt:
+            self.ptt_held = current_ptt
+            self.voice.set_ptt_held(self.ptt_held)
+            self.voice_status = self.voice.status
+
+        if not self.flight_enabled:
+            if pressed & 0x40:
+                self.last_control_message = "ENABLE FLIGHT BEFORE TUNING"
+            return
+        if pressed & 0x40:
+            self.tuning_controls.press_switch(self.joystick1_axes)
+            self.last_control_message = self.tuning_controls.compact_status()
+        tuning_change = self.tuning_controls.update_joystick(self.joystick1_axes)
+        if tuning_change.value_changed:
+            self.last_control_message = self.tuning_controls.compact_status()
+        if pressed & 0x80:
+            self.flight_button_chord.reset()
+            self.digital_controls.reset_commands(self.joystick2_axes)
+            self.last_control_message = "J2 SW FLIGHT COMMAND RESET"
+        else:
+            control_change = self.digital_controls.update_joystick(
+                self.joystick2_axes
+            )
+            if control_change.pitch_changed or control_change.roll_changed:
+                self.last_control_message = "J2 FLIGHT COMMAND"
+        for action in self.flight_button_chord.update(
+            pressed,
+            sample.button_mask,
+            now_seconds,
+        ):
+            self._apply_flight_button_action(action)
 
     def connection_elapsed(self, received_at: float) -> float:
         baseline = self.connection_started_at_seconds or self.ride_started_at_seconds
@@ -254,6 +383,7 @@ class RuntimeState:
             self.applied_preset = None
             self.applied_grade_percent = 0.0
             self.ride_active = False
+            self.flight_enabled = False
         elif event.type is BluetoothEventType.WORKER_STOPPED:
             if self.bluetooth_status != "ERROR":
                 self.bluetooth_status = "IDLE"
@@ -261,7 +391,7 @@ class RuntimeState:
             self.ride_active = False
 
     def update_sensor_state(self, now: float) -> None:
-        self.speed_kmh = effective_speed_kmh(
+        self.ground_speed_kmh = effective_speed_kmh(
             now,
             self.last_ftms_sample_seconds,
             self.ftms_speed_kmh,
@@ -270,6 +400,8 @@ class RuntimeState:
             self.last_wheel_motion_seconds,
             self.wheel_period_seconds,
         )
+        if not self.flight_enabled:
+            self.speed_kmh = self.ground_speed_kmh
         if (
             self.heart_rate_bpm is not None
             and now - self.last_heart_rate_sample_seconds > c.HEART_RATE_STALE_SECONDS
@@ -298,6 +430,74 @@ class RuntimeState:
         )
         self.record_recovery_pose(advance)
         return advance
+
+    def advance_flight(self, delta_seconds: float, now_seconds: float) -> float:
+        if not self.ride_active or not self.flight_enabled:
+            return 0.0
+        rider_power = (
+            float(self.power_watts)
+            if now_seconds - self.last_ftms_sample_seconds <= c.SAMPLE_STALE_SECONDS
+            else 0.0
+        )
+        self.propulsion_power_watts = (
+            self.tuning_controls.values.test_propulsion_power_watts
+            if self.tuning_controls.active
+            else rider_power
+        )
+        result = step_human_powered_flight(
+            self.flight,
+            self.propulsion_power_watts,
+            self.digital_controls.pitch_degrees,
+            self.digital_controls.bank_degrees,
+            self.effective_steering_degrees,
+            delta_seconds,
+            True,
+            self.tuning_controls.values,
+        )
+        if result.took_off:
+            self.last_flight_event = "TAKEOFF"
+        elif result.stall_started:
+            self.last_flight_event = "STALL - NOSE DOWN"
+        elif result.stall_recovered:
+            self.last_flight_event = "STALL RECOVERED"
+        elif result.landed:
+            self.last_flight_event = "LANDED"
+        elif result.landing_blocked:
+            self.last_flight_event = "LANDING REQUIRES COURSE"
+
+        delta = max(0.0, min(0.25, delta_seconds))
+        turn_degrees = self.flight.heading_rate_degrees_per_second * delta
+        midpoint_heading = math.radians(
+            self.heading_degrees + turn_degrees * 0.5
+        )
+        horizontal_speed = math.sqrt(
+            max(
+                0.0,
+                self.flight.airspeed_meters_per_second**2
+                - self.flight.vertical_speed_meters_per_second**2,
+            )
+        )
+        advance = horizontal_speed * delta
+        self.position_x_meters += math.sin(midpoint_heading) * advance
+        self.position_y_meters -= math.cos(midpoint_heading) * advance
+        self.heading_degrees = _unwind_degrees(
+            self.heading_degrees + turn_degrees
+        )
+        self.speed_kmh = self.flight.airspeed_meters_per_second * 3.6
+        self.distance_meters += advance
+        self.laps_completed = int(
+            self.distance_meters // max(1.0, c.DEFAULT_LAP_LENGTH_METERS)
+        )
+        self.record_recovery_pose(advance)
+        return advance
+
+    def update_steering_state(self) -> None:
+        snapshot = self.steering.snapshot()
+        self.steering_tracking = snapshot.tracking
+        self.steering_status = snapshot.status
+        self.steering_message = snapshot.message
+        self.raw_steering_degrees = snapshot.raw_angle_degrees
+        self.effective_steering_degrees = snapshot.effective_angle_degrees
 
     def reset_recovery_trail(self) -> None:
         self.recovery_path_distance_meters = 0.0
@@ -361,6 +561,11 @@ class RuntimeState:
             print("ARRIETTY_BLUETOOTH_STOP_TIMEOUT", flush=True)
         self.ride_active = False
         self.speed_kmh = 0.0
+        self.ground_speed_kmh = 0.0
+        self.flight_enabled = False
+        self.voice.close()
+        if not self.steering.stop():
+            print("ARRIETTY_STEERING_STOP_TIMEOUT", flush=True)
         self.fan.stop()
         if not self.serial.stop():
             print("ARRIETTY_CONTROLLER_STOP_TIMEOUT", flush=True)
@@ -382,7 +587,6 @@ def _sync_xr_navigation(runtime: RuntimeState) -> None:
     """Apply the ride transform to Blender's persistent OpenXR viewpoint."""
     try:
         import bpy
-        from mathutils import Quaternion
 
         xr_state = bpy.context.window_manager.xr_session_state
         xr_state.navigation_location = (
@@ -390,13 +594,92 @@ def _sync_xr_navigation(runtime: RuntimeState) -> None:
             runtime.position_y_meters,
             runtime.flight.altitude_meters,
         )
-        heading = math.radians(runtime.heading_degrees) * 0.5
-        xr_state.navigation_rotation = Quaternion(
-            (math.cos(heading), 0.0, 0.0, math.sin(heading))
-        )
+        xr_state.navigation_rotation = _navigation_orientation(runtime)
     except (AttributeError, RuntimeError):
         # Desktop-only runs do not have an active XR session state.
         pass
+
+
+def _vehicle_orientation(runtime: RuntimeState):
+    from mathutils import Quaternion
+
+    heading = Quaternion(
+        (0.0, 0.0, 1.0), math.radians(runtime.heading_degrees)
+    )
+    if not runtime.flight.airborne:
+        return heading.to_matrix()
+    pitch = Quaternion(
+        (1.0, 0.0, 0.0), math.radians(-runtime.flight.pitch_degrees)
+    )
+    bank = Quaternion(
+        (0.0, 1.0, 0.0), math.radians(-runtime.flight.bank_degrees)
+    )
+    return (heading @ pitch @ bank).to_matrix()
+
+
+def _navigation_orientation(runtime: RuntimeState):
+    from mathutils import Quaternion
+
+    alignment = Quaternion(
+        (0.0, 0.0, 1.0), math.radians(runtime.hmd_alignment_degrees)
+    )
+    return alignment @ _vehicle_orientation(runtime).to_quaternion()
+
+
+def _quaternion_forward_heading_degrees(rotation) -> float | None:
+    """Return the horizontal heading of an XR viewer's local -Z axis."""
+    w, x, y, z = (float(value) for value in rotation)
+    forward_x = -2.0 * (x * z + w * y)
+    forward_y = 2.0 * (w * x - y * z)
+    if math.hypot(forward_x, forward_y) < 0.1:
+        return None
+    # Heading zero follows this scene's accepted OpenXR forward axis, Y-.
+    return math.degrees(math.atan2(forward_x, -forward_y))
+
+
+def _quaternion_z_rotation_degrees(rotation) -> float:
+    w, x, y, z = (float(value) for value in rotation)
+    return math.degrees(
+        math.atan2(
+            2.0 * (w * z + x * y),
+            1.0 - 2.0 * (y * y + z * z),
+        )
+    )
+
+
+def _try_align_hmd_to_bike(runtime: RuntimeState, now: float) -> bool:
+    if runtime.hmd_aligned or now > runtime.hmd_alignment_pending_until_seconds:
+        return runtime.hmd_aligned
+    try:
+        import bpy
+
+        xr_state = bpy.context.window_manager.xr_session_state
+        viewer_heading = _quaternion_forward_heading_degrees(
+            xr_state.viewer_pose_rotation
+        )
+        if viewer_heading is None:
+            runtime.hmd_alignment_message = "HMD FORWARD POSE IS NOT VALID"
+            return False
+        navigation_heading = _quaternion_z_rotation_degrees(
+            xr_state.navigation_rotation
+        )
+        correction = _unwind_degrees(
+            runtime.heading_degrees - viewer_heading
+        )
+        corrected_navigation = _unwind_degrees(
+            navigation_heading + correction
+        )
+        runtime.hmd_alignment_degrees = _unwind_degrees(
+            corrected_navigation - runtime.heading_degrees
+        )
+        runtime.hmd_aligned = True
+        runtime.hmd_alignment_message = (
+            f"HMD ALIGNED {runtime.hmd_alignment_degrees:+.1f} DEG"
+        )
+        return True
+    except (ImportError, AttributeError, RuntimeError):
+        runtime.hmd_alignment_message = "WAITING FOR VALID OPENXR HMD POSE"
+        return False
 
 
 def _reset_xr_navigation() -> None:
@@ -443,6 +726,7 @@ def tick(controller) -> None:
         owner["heart_rate_status"] = "DISCONNECTED"
         runtime.fan.start()
         runtime.serial.start()
+        runtime.steering.start()
         if runtime.prepare_devices():
             print("ARRIETTY_BLUETOOTH_PREPARING", flush=True)
         print("ARRIETTY_UP_RUNTIME_READY", flush=True)
@@ -459,8 +743,6 @@ def tick(controller) -> None:
             owner["controller_port"] = ""
         elif event.type is ControllerEventType.SAMPLE and event.sample is not None:
             sample = event.sample
-            runtime.controller_button_mask = sample.button_mask
-            runtime.set_brake_button_held(bool(sample.button_mask & 0x20))
             runtime.controller_sample_count += 1
             if sample.button_mask:
                 runtime.controller_nonzero_samples += 1
@@ -499,30 +781,9 @@ def tick(controller) -> None:
                         )
                 if (transition.pressed | transition.released) & 0x20:
                     runtime.set_brake_button_held(bool(transition.current & 0x20))
+            runtime.handle_controller_input(sample, transition, now)
 
     import bge
-
-    if (
-        not runtime.ending
-        and bge.logic.keyboard.inputs[bge.events.PAD0].activated
-    ):
-        if runtime.start_ride():
-            print("ARRIETTY_RIDE_START NUMPAD0", flush=True)
-        elif runtime.last_start_action == "SAFETY_RETURN":
-            print(
-                "ARRIETTY_SAFETY_RETURN "
-                f"{runtime.last_recovered_meters:.3f}m NUMPAD0",
-                flush=True,
-            )
-
-    if bge.logic.keyboard.inputs[bge.events.PAD8].activated:
-        runtime.move_manual(1.0)
-    if bge.logic.keyboard.inputs[bge.events.PAD2].activated:
-        runtime.move_manual(-1.0)
-    if bge.logic.keyboard.inputs[bge.events.PAD4].activated:
-        runtime.turn_manual(1.0)
-    if bge.logic.keyboard.inputs[bge.events.PAD6].activated:
-        runtime.turn_manual(-1.0)
 
     if runtime.bluetooth_generation > 0:
         for event in runtime.bluetooth.drain_events():
@@ -557,8 +818,20 @@ def tick(controller) -> None:
                     f"{event.message}",
                     flush=True,
                 )
+    runtime.flush_flight_button(now)
     runtime.update_sensor_state(now)
-    advanced = runtime.advance_ground(delta)
+    runtime.update_steering_state()
+    _try_align_hmd_to_bike(runtime, now)
+    voice_status = runtime.voice.poll()
+    if voice_status is not None:
+        runtime.voice_status = voice_status[0]
+    advanced = 0.0
+    if runtime.ride_active and runtime.steering_tracking and runtime.hmd_aligned:
+        advanced = (
+            runtime.advance_flight(delta, now)
+            if runtime.flight_enabled
+            else runtime.advance_ground(delta)
+        )
     if (
         advanced > 0.0
         and runtime.first_motion_after_seconds <= 0.0
@@ -579,6 +852,17 @@ def tick(controller) -> None:
     owner["controller_released_latch"] = runtime.button_edges.released_latch
     owner["controller_transition_count"] = runtime.button_edges.transition_count
     owner["ride_active"] = runtime.ride_active
+    owner["hmd_aligned"] = runtime.hmd_aligned
+    owner["hmd_alignment_degrees"] = runtime.hmd_alignment_degrees
+    owner["hmd_alignment_message"] = runtime.hmd_alignment_message
+    owner["flight_enabled"] = runtime.flight_enabled
+    owner["flight_airborne"] = runtime.flight.airborne
+    owner["flight_stalled"] = runtime.flight.stalled
+    owner["flight_event"] = runtime.last_flight_event
+    owner["flight_command_pitch_degrees"] = runtime.digital_controls.pitch_degrees
+    owner["flight_command_bank_degrees"] = runtime.digital_controls.bank_degrees
+    owner["flight_tuning"] = runtime.tuning_controls.compact_status()
+    owner["propulsion_power_watts"] = runtime.propulsion_power_watts
     owner["bluetooth_status"] = runtime.bluetooth_status
     owner["bluetooth_message"] = runtime.bluetooth_message
     owner["trainer_found_after_seconds"] = runtime.trainer_found_after_seconds
@@ -595,6 +879,7 @@ def tick(controller) -> None:
     owner["applied_preset"] = -1 if runtime.applied_preset is None else runtime.applied_preset
     owner["applied_grade_percent"] = runtime.applied_grade_percent
     owner["speed_kmh"] = runtime.speed_kmh
+    owner["ground_speed_kmh"] = runtime.ground_speed_kmh
     owner["ftms_speed_kmh"] = runtime.ftms_speed_kmh
     owner["cadence_rpm"] = runtime.cadence_rpm
     owner["power_watts"] = runtime.power_watts
@@ -603,6 +888,13 @@ def tick(controller) -> None:
     owner["position_x_meters"] = runtime.position_x_meters
     owner["position_y_meters"] = runtime.position_y_meters
     owner["heading_degrees"] = runtime.heading_degrees
+    owner["steering_tracking"] = runtime.steering_tracking
+    owner["steering_status"] = runtime.steering_status
+    owner["steering_message"] = runtime.steering_message
+    owner["raw_steering_degrees"] = runtime.raw_steering_degrees
+    owner["effective_steering_degrees"] = runtime.effective_steering_degrees
+    owner["voice_status"] = runtime.voice_status
+    owner["ptt_held"] = runtime.ptt_held
     owner["distance_meters"] = runtime.distance_meters
     owner["laps_completed"] = runtime.laps_completed
     owner["last_recovered_meters"] = runtime.last_recovered_meters
@@ -611,11 +903,7 @@ def tick(controller) -> None:
         runtime.position_y_meters,
         runtime.flight.altitude_meters,
     )
-    from mathutils import Euler
-
-    owner.worldOrientation = Euler(
-        (0.0, 0.0, math.radians(runtime.heading_degrees)), "XYZ"
-    ).to_matrix()
+    owner.worldOrientation = _vehicle_orientation(runtime)
     _sync_xr_navigation(runtime)
     runtime.fan.tick(runtime.speed_kmh if runtime.ride_active else 0.0, now)
     owner["fan_status"] = runtime.fan.status

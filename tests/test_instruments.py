@@ -11,6 +11,7 @@ class InstrumentTests(unittest.TestCase):
         state.heart_rate_bpm = 87
         state.power_watts = 214
         state.speed_kmh = 23.45
+        state.ground_speed_kmh = 23.45
         state.applied_preset = 5
         state.applied_grade_percent = 3.0
         state.cadence_rpm = 81.25
@@ -23,6 +24,8 @@ class InstrumentTests(unittest.TestCase):
         self.assertEqual(panel.trainer_grade, " 3.0 %")
         self.assertEqual(panel.mode, "RIDE")
         self.assertIn("CAD     81.2 rpm", panel.physics)
+        self.assertIn("STR IDLE +0.0", panel.debug)
+        self.assertIn("CMD P+0 R+0", panel.debug)
         self.assertIn("FRAME 16.7 ms", panel.debug)
 
     def test_unavailable_grade_and_heart_rate_are_not_shown_as_zero(self):

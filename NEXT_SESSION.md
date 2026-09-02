@@ -2,20 +2,26 @@
 
 Last updated: 2026-09-03 (Asia/Tokyo)
 
-The panel was implemented during the morning. A long live hardware/OpenXR test
-window is expected after work this evening, as on 2026-09-02.
+The panel was implemented and its placement accepted during the morning. The
+wired controls, VIVE steering, HMD alignment, voice PTT client, and flight loop
+are now implemented for the next live hardware/OpenXR run.
 
 ## Next live test
 
 Work from `C:\Users\azoo\git\Arrietty-UP`.
 
-The first VR instrument-panel prototype is now authored in the UPBGE scene.
-Its Blender render and Blender-independent display tests pass, but it still
-needs completion of its OpenXR/HMD fit test. The first live adjustment moved it
+The first VR instrument-panel prototype is now authored in the UPBGE scene and
+its placement was accepted in OpenXR. The first live adjustment moved it
 from 1.0 m to 1.3 m forward and increased its upward tilt from 26.565 to 46.565
-degrees while retaining the 1.0 m center height. Confirm that the small
-right-side debug text remains readable in both eyes and that dynamic values
-update while T2, Garmin, and the fan are active.
+degrees while retaining the 1.0 m center height. Its right-side debug block was
+expanded to show steering, flight commands, tuning, and voice status. Confirm
+that those small dynamic values remain readable in both eyes.
+
+There are no numeric-keypad runtime controls. With the HMD facing the physical
+bicycle direction and the handle centered, press `P` to enter the game and use
+Button 1 to align/start. Verify fixed-serial VIVE steering, then Button 2,
+Joystick 2, Buttons 3+4, Joystick 1 tuning, Button 5 PTT, Button 6 brake, flight
+takeoff/turn/stall recovery/landing, and the second-Button-1 safety return.
 
 Terrain may also be prepared as a visual reference, but its authoring source
 should remain in Blender 5.2 LTS. Make a separate copy before opening or saving
@@ -28,9 +34,9 @@ scope here.
 
 ## Working baseline
 
-- Arrietty-UP version: `0.13.1-up.2`
+- Arrietty-UP version: `0.13.1-up.3`
 - Public repository: https://github.com/ysk424/Arrietty-UP
-- Accepted baseline commit before this handoff: `6bb494009434a6f95bd74ee51d569f1b8a2a5304`
+- Accepted and pushed panel baseline: `2688f33`
 - Standard Blender: locally built Blender 5.2.0 LTS
 - UPBGE build base: Blender 5.3.0 Alpha / UPBGE 0.53
 - Standard Blender MCP: `127.0.0.1:9876`
@@ -52,16 +58,15 @@ The final integrated hardware run on 2026-09-02 was accepted as **PASS**.
 
 - OpenXR remained displayed while entering and leaving the UPBGE game.
 - CYCPLUS T2 speed data produced ground movement in the HMD.
-- The wired controller's Button 1 armed movement; Numpad 0 is the keyboard
-  equivalent.
+- The wired controller's Button 1 armed movement.
 - The speed-driven ESP32 fan reacted to detected speed.
 - Garmin heart-rate reception and both ESP32 devices were operational.
 - Last observed wired controller connection: `COM7`, 115200 bps.
 - HMD forward travel for this scene is world `Y-`.
 
 The game starts and maintains the T2 connection from its first frame. Button 1
-or Numpad 0 only arms movement, so a long BLE setup must not block the user's
-start action. T2 FTMS speed notification is the critical path. Garmin scanning,
+aligns/arms movement, so a long BLE setup must not block the user's start
+action. T2 FTMS speed notification is the critical path. Garmin scanning,
 resistance control, and optional CSC initialization happen later or in
 parallel; it is acceptable for Garmin and the fan to become ready after motion
 starts. Garmin broadcasting can stop when it is not actively communicated
@@ -72,9 +77,8 @@ Connection phase timings are exposed through runtime properties, including
 `first_ftms_after_seconds`, `control_ready_after_seconds`, and
 `first_motion_after_seconds`. Use these instead of estimating a delay by eye.
 
-The second Button 1/Numpad 0 safety-return behavior is implemented and unit
-tested. Give it a dedicated measured live check before relying on it as a
-finished feature.
+The second Button 1 safety-return behavior is implemented and unit tested. Give
+it a dedicated measured live check before relying on it as a finished feature.
 
 ## Important local fixes and backups
 
@@ -106,10 +110,11 @@ Run Blender-independent tests with:
 python3 -m unittest discover -s tests -v
 ```
 
-The current baseline has 43 passing tests, including panel formatting and PFD
-attitude-transform tests. Flight physics and digital/tuning controls are unit
-tested but are not yet connected to the UPBGE game loop. Remaining integrations
-include VIVE steering, flight runtime, ride CSV, voice PTT, course-surface
-collision, presets, and VR alerts.
+The current baseline has 55 passing tests, including panel formatting, PFD
+attitude transforms, button chord handling, VIVE steering math, voice protocol,
+HMD alignment math, and the connected flight runtime. Remaining integrations
+include ride CSV, course-surface collision, resistance-preset selection, and VR
+alerts. The new controls and flight loop still require the live test described
+above.
 
 Preserve unrelated user work in `../Arrietty` and `../Secret-World`.

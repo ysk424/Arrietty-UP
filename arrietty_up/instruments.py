@@ -55,6 +55,14 @@ def build_readout(runtime, delta_seconds: float) -> InstrumentReadout:
         else f"{runtime.applied_grade_percent:4.1f} %"
     )
     reported_fan = "--" if runtime.fan.reported_level is None else str(runtime.fan.reported_level)
+    ground_speed = getattr(runtime, "ground_speed_kmh", runtime.speed_kmh)
+    steering_status = getattr(runtime, "steering_status", "IDLE")
+    steering_degrees = getattr(runtime, "effective_steering_degrees", 0.0)
+    command_pitch = getattr(runtime.digital_controls, "pitch_degrees", 0.0)
+    command_roll = getattr(runtime.digital_controls, "roll_right_degrees", 0.0)
+    tuning_status = runtime.tuning_controls.compact_status()
+    if runtime.tuning_controls.active:
+        tuning_status = tuning_status.replace("TUNE ", "T", 1)
     physics = "\n".join(
         (
             f"V/S    {flight.vertical_speed_meters_per_second:+5.1f} m/s",
@@ -69,16 +77,18 @@ def build_readout(runtime, delta_seconds: float) -> InstrumentReadout:
         (
             f"T2  {runtime.bluetooth_status}",
             f"HR  {runtime.heart_rate_status}",
+            f"STR {steering_status} {steering_degrees:+.1f}",
+            f"CMD P{command_pitch:+.0f} R{command_roll:+.0f}",
+            tuning_status,
             f"FAN {runtime.fan.requested_level}/{reported_fan}",
-            f"POS {runtime.position_x_meters:+.1f} {runtime.position_y_meters:+.1f} m",
-            f"DST {runtime.distance_meters:.1f} m",
+            f"VOICE {getattr(runtime, 'voice_status', 'IDLE')}",
             f"FRAME {max(0.0, delta_seconds) * 1000.0:4.1f} ms",
         )
     )
     return InstrumentReadout(
         heart_rate=heart_rate,
         trainer_power=str(max(0, runtime.power_watts)),
-        ground_speed=f"{max(0.0, runtime.speed_kmh):4.1f} km/h",
+        ground_speed=f"{max(0.0, ground_speed):4.1f} km/h",
         trainer_grade=grade,
         mode=_mode(runtime),
         airspeed=f"{airspeed_kmh:.0f}",

@@ -1,8 +1,13 @@
 import unittest
 
 from arrietty_up.bluetooth import BluetoothEvent, BluetoothEventType
+from arrietty_up.controller_protocol import ButtonTransition, ControllerSample
 from arrietty_up.models import CscSample, TrainerSample
-from arrietty_up.runtime import RuntimeState
+from arrietty_up.runtime import (
+    RuntimeState,
+    _quaternion_forward_heading_degrees,
+    _quaternion_z_rotation_degrees,
+)
 
 
 class FakeBluetooth:
@@ -26,11 +31,45 @@ class FakeBluetooth:
         return True
 
 
+class FakeVoice:
+    def __init__(self):
+        self.ptt_held = False
+        self.status = "IDLE"
+        self.edges = []
+
+    def set_ptt_held(self, held):
+        self.ptt_held = held
+        self.edges.append(held)
+        self.status = "PTT" if held else "SENT"
+        return True
+
+    def poll(self):
+        return None
+
+    def close(self):
+        pass
+
+
 class RuntimeStateTests(unittest.TestCase):
     def make_state(self):
         state = RuntimeState()
         state.bluetooth = FakeBluetooth()
+        state.voice = FakeVoice()
         return state
+
+    @staticmethod
+    def sample(sequence=1, j1=(0, 0), j2=(0, 0), buttons=0):
+        return ControllerSample(sequence, j1[0], j1[1], j2[0], j2[1], buttons)
+
+    @staticmethod
+    def transition(previous, current, sequence=1):
+        return ButtonTransition(
+            sequence,
+            previous,
+            current,
+            current & ~previous,
+            previous & ~current,
+        )
 
     def test_start_ride_and_brake_requests(self):
         state = self.make_state()
@@ -178,6 +217,136 @@ class RuntimeStateTests(unittest.TestCase):
         self.assertAlmostEqual(state.last_recovered_meters, 2.0, delta=0.11)
         self.assertAlmostEqual(state.position_y_meters, -1.0, delta=0.11)
         self.assertAlmostEqual(state.distance_meters, distance_before)
+
+    def test_button_two_toggles_flight_and_airborne_blocks_ground_mode(self):
+        state = self.make_state()
+        state.start_ride()
+        state.ground_speed_kmh = 24.0
+        sample = self.sample(buttons=0x02)
+        state.handle_controller_input(
+            sample,
+            self.transition(0, 0x02),
+            1.0,
+        )
+        self.assertTrue(state.flight_enabled)
+        self.assertAlmostEqual(state.flight.airspeed_meters_per_second, 24.0 / 3.6)
+
+        state.flight.airborne = True
+        state.handle_controller_input(
+            self.sample(sequence=2, buttons=0x02),
+            self.transition(0, 0x02, 2),
+            2.0,
+        )
+        self.assertTrue(state.flight_enabled)
+        self.assertEqual(state.last_mode_action, "LAND BEFORE GROUND MODE")
+
+    def test_joystick_two_controls_and_reset_are_flight_only(self):
+        state = self.make_state()
+        axis = 26214
+        state.handle_controller_input(self.sample(j2=(axis, 0)), None, 1.0)
+        self.assertEqual(state.digital_controls.pitch_degrees, 0.0)
+
+        state.start_ride()
+        state.toggle_flight()
+        state.handle_controller_input(self.sample(j2=(0, 0)), None, 1.9)
+        state.handle_controller_input(self.sample(j2=(axis, 0)), None, 2.0)
+        state.handle_controller_input(self.sample(j2=(axis, 0)), None, 2.1)
+        self.assertEqual(state.digital_controls.pitch_degrees, 1.0)
+        state.handle_controller_input(self.sample(j2=(0, 0)), None, 2.2)
+        state.handle_controller_input(self.sample(j2=(0, -axis)), None, 2.3)
+        self.assertEqual(state.digital_controls.roll_right_degrees, 1.0)
+
+        state.handle_controller_input(
+            self.sample(buttons=0x80),
+            self.transition(0, 0x80),
+            2.4,
+        )
+        self.assertEqual(state.digital_controls.pitch_degrees, 0.0)
+        self.assertEqual(state.digital_controls.roll_right_degrees, 0.0)
+
+    def test_button_three_four_chord_and_single_roll(self):
+        state = self.make_state()
+        state.start_ride()
+        state.toggle_flight()
+        state.handle_controller_input(
+            self.sample(buttons=0x04),
+            self.transition(0, 0x04),
+            1.0,
+        )
+        state.handle_controller_input(
+            self.sample(sequence=2, buttons=0x0C),
+            self.transition(0x04, 0x0C, 2),
+            1.05,
+        )
+        self.assertEqual(state.digital_controls.pitch_degrees, 1.0)
+        self.assertEqual(state.digital_controls.roll_right_degrees, 0.0)
+
+        state.handle_controller_input(
+            self.sample(sequence=3, buttons=0x04),
+            self.transition(0, 0x04, 3),
+            2.0,
+        )
+        state.flush_flight_button(2.081)
+        self.assertEqual(state.digital_controls.roll_right_degrees, -1.0)
+
+    def test_joystick_one_tuning_and_button_five_ptt(self):
+        state = self.make_state()
+        state.start_ride()
+        state.toggle_flight()
+        state.handle_controller_input(
+            self.sample(buttons=0x40),
+            self.transition(0, 0x40),
+            1.0,
+        )
+        self.assertTrue(state.tuning_controls.active)
+        state.handle_controller_input(self.sample(j1=(26214, 0)), None, 1.1)
+        self.assertEqual(
+            state.tuning_controls.values.test_propulsion_power_watts,
+            100.0,
+        )
+
+        state.handle_controller_input(
+            self.sample(sequence=2, buttons=0x10),
+            self.transition(0, 0x10, 2),
+            2.0,
+        )
+        state.handle_controller_input(
+            self.sample(sequence=3),
+            self.transition(0x10, 0, 3),
+            2.1,
+        )
+        self.assertEqual(state.voice.edges, [True, False])
+
+    def test_flight_step_uses_rider_power_and_advances_in_openxr_forward(self):
+        state = self.make_state()
+        state.start_ride()
+        state.ground_speed_kmh = 24.0
+        state.toggle_flight()
+        state.power_watts = 140
+        state.last_ftms_sample_seconds = 100.0
+        state.digital_controls.pitch_degrees = 1.0
+        total = 0.0
+        for index in range(20):
+            now = 100.0 + index * 0.1
+            state.last_ftms_sample_seconds = now
+            total += state.advance_flight(0.1, now)
+        self.assertTrue(state.flight.airborne)
+        self.assertGreater(total, 0.0)
+        self.assertAlmostEqual(state.position_x_meters, 0.0)
+        self.assertLess(state.position_y_meters, 0.0)
+        self.assertGreater(state.flight.altitude_meters, 0.0)
+        self.assertEqual(state.propulsion_power_watts, 140.0)
+
+    def test_xr_quaternion_heading_helpers_follow_scene_forward(self):
+        self.assertAlmostEqual(
+            _quaternion_forward_heading_degrees((0.5, -0.5, -0.5, 0.5)),
+            90.0,
+        )
+        root_half = 2.0**-0.5
+        self.assertAlmostEqual(
+            _quaternion_z_rotation_degrees((root_half, 0, 0, root_half)),
+            90.0,
+        )
 
 
 if __name__ == "__main__":

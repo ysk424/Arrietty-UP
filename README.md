@@ -32,8 +32,8 @@ UPBGE source tree. T2 speed-driven OpenXR navigation, Garmin heart rate, the
 wired controller, and speed-driven fan levels have also passed a live run.
 
 The game begins preparing and maintaining T2 as soon as its first UPBGE frame
-runs; Button 1 or Numpad 0 only arms movement. Pedalling during preparation
-does not move the HMD or raise the fan level. The T2 worker uses the
+runs; Button 1 aligns the HMD and centered VIVE handle, then arms movement.
+Pedalling during preparation does not move the HMD or raise the fan level. The T2 worker uses the
 installation's known address
 `F8:10:89:93:10:C8`, with advertisement scanning as a fallback. It subscribes
 to FTMS Indoor Bike Data before resistance control and optional CSC setup.
@@ -41,23 +41,38 @@ Garmin discovery begins in parallel as soon as T2 speed notifications are
 active. Runtime properties expose `gatt_connected_after_seconds`,
 `trainer_ready_after_seconds`, `first_ftms_after_seconds`, and
 `control_ready_after_seconds` for one-run latency diagnosis. The separate
-`first_motion_after_seconds` value measures Button 1/Numpad 0 to actual motion.
+`first_motion_after_seconds` value measures Button 1 to actual motion.
 
 ## Port status
 
 Live verified: persistent OpenXR game entry/exit, T2 FTMS ground movement,
-Garmin heart rate, wired Button 1, speed-driven fan output, and forward-axis
-OpenXR navigation. Implemented and unit tested but awaiting the next live run:
-early T2/Garmin preparation, direct-address T2 connection, speed-first GATT
-setup, connection phase timings, and the two-meter safety return.
+Garmin heart rate, wired Button 1, speed-driven fan output, forward-axis OpenXR
+navigation, and the adjusted instrument-panel placement. Implemented and unit
+tested but awaiting the next live run: direct-address/early T2 setup and its
+timings, two-meter safety return, fixed-serial VIVE steering, HMD alignment,
+the complete wired flight controls, flight runtime, and Button 5 voice PTT.
 
-The flight physics and digital/tuning control calculations are unit tested but
-not yet connected to the UPBGE game loop. The VR instrument-panel prototype is
-authored and runtime-wired but awaits its HMD fit/readability test. VIVE
-steering, flight runtime, ride CSV, voice PTT, course-surface collision,
-presets, and VR alerts remain to be integrated. This list describes the
-implementation state; the target feature list above is not a claim that those
-items are already complete.
+Ride CSV, course-surface collision, resistance-preset selection, and VR alerts
+remain to be integrated. This list describes the implementation state; the
+target feature list above is not a claim that those items are already complete.
+
+## Wired controls
+
+Runtime operation intentionally has no numeric-keypad bindings. `P` starts the
+game and `Esc` stops it safely; ride and flight operation use the wired panel:
+
+- Button 1: align the current HMD view and centered VIVE handle, then start;
+  press again for the approximately 2 m safety return.
+- Button 2: switch between ground and human-powered flight; ground mode is
+  blocked until the aircraft has landed.
+- Button 3 / 4: left / right roll by 1 degree. Press both within 80 ms for
+  pitch-up by 1 degree.
+- Button 5: PTT down/up through the existing UDP voice bridge.
+- Button 6: apply 3% T2 grade while held as the brake.
+- Joystick 2: one center-to-edge gesture changes pitch or roll by 1 degree;
+  its switch resets both commands.
+- Joystick 1: its switch enters/advances/completes flight tuning; left/right
+  gestures adjust the selected value one step.
 
 ## Instrument panel prototype
 

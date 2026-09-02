@@ -262,9 +262,9 @@ def _build_right(panel, white, cyan, amber):
     _text(
         "Instrument_DebugText",
         panel,
-        "T2  IDLE\nHR  DISCONNECTED\nFAN 0/--\nPOS +0.0 +0.0 m\nDST 0.0 m\nFRAME  0.0 ms",
+        "T2  IDLE\nHR  DISCONNECTED\nSTR IDLE +0.0\nCMD P+0 R+0\nTUNE OFF\nFAN 0/--\nVOICE IDLE\nFRAME  0.0 ms",
         (x0, 0.022, -0.055),
-        0.014,
+        0.012,
         amber,
     )
 
