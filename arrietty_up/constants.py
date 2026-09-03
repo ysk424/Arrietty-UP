@@ -1,6 +1,6 @@
 """Constants ported from Arrietty-UE 0.13.1."""
 
-VERSION = "0.13.1-up.3"
+VERSION = "0.13.1-up.4"
 STEERING_CONTROLLER_SERIAL = "LHR-9EFF8645"
 RIDE_SURFACE_TAG = "SecretWorldRideSurface"
 EYE_HEIGHT_METERS = 1.5

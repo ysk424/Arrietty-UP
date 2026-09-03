@@ -83,6 +83,7 @@ def build_readout(runtime, delta_seconds: float) -> InstrumentReadout:
     )
     physics = "\n".join(
         (
+            f"ALT    {altitude_meters:5.1f} m",
             f"V/S    {flight.vertical_speed_meters_per_second:+5.1f} m/s",
             f"PITCH  {flight.pitch_degrees:+5.1f} deg",
             f"BANK   {flight.bank_degrees:+5.1f} deg",
@@ -100,6 +101,7 @@ def build_readout(runtime, delta_seconds: float) -> InstrumentReadout:
             tuning_status,
             f"FAN {runtime.fan.requested_level}/{reported_fan}",
             f"VOICE {getattr(runtime, 'voice_status', 'IDLE')}",
+            f"XR {getattr(runtime, 'xr_bridge_status', 'UNKNOWN')}",
             f"FRAME {max(0.0, delta_seconds) * 1000.0:4.1f} ms",
         )
     )
@@ -145,6 +147,26 @@ def attitude_transform(
     )
 
 
+def attitude_shader_color(
+    pitch_degrees: float,
+    bank_degrees: float,
+) -> tuple[float, float, float, float]:
+    """Encode attitude for the fixed circular GPU-rendered PFD disc.
+
+    Object color is the low-overhead per-object uniform already carried by
+    UPBGE. Red/green contain the sine/cosine of the apparent horizon rotation;
+    blue contains clamped pitch in the -30..+30 degree display range.
+    """
+    pitch = max(-30.0, min(30.0, pitch_degrees))
+    rotation = math.radians(-bank_degrees)
+    return (
+        0.5 + 0.5 * math.sin(rotation),
+        0.5 + 0.5 * math.cos(rotation),
+        0.5 + pitch / 60.0,
+        1.0,
+    )
+
+
 def _scene_object(scene, name: str):
     try:
         return scene.objects[name]
@@ -159,7 +181,7 @@ def _set_text(scene, name: str, value: str) -> None:
 
 
 def update_upbge_panel(scene, runtime, delta_seconds: float) -> None:
-    """Update authored font objects and the moving PFD horizon."""
+    """Update authored text and the fixed-disc PFD attitude uniform."""
     readout = build_readout(runtime, delta_seconds)
     fields = {
         "Instrument_HeartRateValue": readout.heart_rate,
@@ -182,28 +204,12 @@ def update_upbge_panel(scene, runtime, delta_seconds: float) -> None:
     for suffix, value in zip(("M2", "M1", "P1", "P2"), readout.altitude_ticks):
         _set_text(scene, f"Instrument_AltitudeTick_{suffix}", value)
 
-    horizon = _scene_object(scene, "Instrument_PFD_Horizon")
-    if horizon is not None:
-        from mathutils import Matrix
-
-        shift_x, shift_z, rotation = attitude_transform(
+    attitude = _scene_object(scene, "Instrument_PFD_Attitude")
+    if attitude is not None:
+        # The disc geometry never leaves the circular aperture. Its material
+        # decodes this object-color uniform and draws sky, earth, horizon and
+        # pitch marks on the GPU.
+        attitude.color = attitude_shader_color(
             runtime.flight.pitch_degrees,
             runtime.flight.bank_degrees,
         )
-        # Move the ground/sky boundary and pitch ladder as one rigid group.
-        # The translation is rotated into the banked display axes.
-        horizon.localPosition = (
-            shift_x,
-            horizon.get("panel_base_y", 0.018),
-            shift_z,
-        )
-        horizon.localOrientation = Matrix.Rotation(
-            math.radians(rotation), 3, "Y"
-        )
-        ladder = _scene_object(scene, "Instrument_PFD_Ladder")
-        if ladder is not None:
-            ladder.localPosition = (
-                0.0,
-                ladder.get("panel_base_y", 0.005),
-                0.0,
-            )

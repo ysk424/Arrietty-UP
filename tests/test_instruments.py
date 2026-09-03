@@ -1,8 +1,8 @@
 import unittest
 from types import SimpleNamespace
-from unittest.mock import patch
 
 from arrietty_up.instruments import (
+    attitude_shader_color,
     attitude_transform,
     build_readout,
     update_upbge_panel,
@@ -29,6 +29,7 @@ class InstrumentTests(unittest.TestCase):
         self.assertEqual(panel.ground_speed, "23.4 km/h")
         self.assertEqual(panel.trainer_grade, " 3.0 %")
         self.assertEqual(panel.mode, "RIDE")
+        self.assertIn("ALT      0.0 m", panel.physics)
         self.assertIn("CAD     81.2 rpm", panel.physics)
         self.assertIn("STR IDLE +0.0", panel.debug)
         self.assertIn("CMD P+0 R+0", panel.debug)
@@ -57,6 +58,7 @@ class InstrumentTests(unittest.TestCase):
         self.assertEqual(panel.altitude_ticks, ("0", "50", "150", "200"))
         self.assertEqual(panel.pfd_status, "PFD / AIRBORNE")
         self.assertEqual(panel.pfd_state, "P +0.0  B +0.0  ALT 123.0 m")
+        self.assertIn("ALT    123.0 m", panel.physics)
 
     def test_low_altitude_keeps_tenths_visible(self):
         state = RuntimeState()
@@ -78,23 +80,24 @@ class InstrumentTests(unittest.TestCase):
     def test_pfd_pitch_translation_is_bounded(self):
         self.assertEqual(attitude_transform(1000.0, 0.0), (0.0, -0.12, 0.0))
 
-    def test_scene_update_moves_horizon_and_ladder_as_one_group(self):
+    def test_pfd_shader_encoding_is_bounded(self):
+        self.assertEqual(attitude_shader_color(1000.0, 0.0), (0.5, 1.0, 1.0, 1.0))
+        encoded = attitude_shader_color(10.0, 90.0)
+        self.assertAlmostEqual(encoded[0], 0.0)
+        self.assertAlmostEqual(encoded[1], 0.5)
+        self.assertAlmostEqual(encoded[2], 2.0 / 3.0)
+
+    def test_scene_update_sets_fixed_pfd_attitude_uniform(self):
         class FakeObject(dict):
             localPosition = None
             localOrientation = None
+            color = None
 
-        class FakeMatrix:
-            @staticmethod
-            def Rotation(angle, size, axis):
-                return (angle, size, axis)
-
-        horizon = FakeObject(panel_base_y=0.018)
-        ladder = FakeObject(panel_base_y=0.005)
+        attitude = FakeObject()
         altitude = FakeObject(Text="0")
         scene = SimpleNamespace(
             objects={
-                "Instrument_PFD_Horizon": horizon,
-                "Instrument_PFD_Ladder": ladder,
+                "Instrument_PFD_Attitude": attitude,
                 "Instrument_AltitudeValue": altitude,
             }
         )
@@ -102,15 +105,11 @@ class InstrumentTests(unittest.TestCase):
         state.flight.pitch_degrees = 10.0
         state.flight.bank_degrees = 90.0
         state.flight.altitude_meters = 0.4
-        with patch.dict(
-            "sys.modules",
-            {"mathutils": SimpleNamespace(Matrix=FakeMatrix)},
-        ):
-            update_upbge_panel(scene, state, 0.01)
+        update_upbge_panel(scene, state, 0.01)
 
-        self.assertAlmostEqual(horizon.localPosition[0], 0.04)
-        self.assertAlmostEqual(horizon.localPosition[2], 0.0, places=7)
-        self.assertEqual(ladder.localPosition, (0.0, 0.005, 0.0))
+        self.assertAlmostEqual(attitude.color[0], 0.0)
+        self.assertAlmostEqual(attitude.color[1], 0.5)
+        self.assertAlmostEqual(attitude.color[2], 2.0 / 3.0)
         self.assertEqual(altitude["Text"], "0.4")
 
 

@@ -4,8 +4,8 @@ Last updated: 2026-09-03 (Asia/Tokyo)
 
 The panel placement and human-powered flight controls were accepted in live
 OpenXR tests. The morning 2026-09-03 run achieved takeoff and controlled turns.
-The current build is a working baseline, but the PFD attitude presentation
-still needs correction as described below.
+The next-test build replaces per-frame `bpy` OpenXR access with a compiled C++
+bridge and replaces the moving PFD geometry with one fixed circular GPU disc.
 
 ## Next live test
 
@@ -19,16 +19,16 @@ expanded to show steering, flight commands, tuning, and voice status. Confirm
 that those small dynamic values remain readable in both eyes.
 
 There are no numeric-keypad runtime controls. Start with
-`tools/launch_openxr_game.py` as shown below. With the HMD facing the physical
+`tools/launch_live_test.ps1` as shown below. With the HMD facing the physical
 bicycle direction and the handle centered, use Button 1 to align/start.
 
-The next instrument task is to redesign the PFD horizon presentation. During
-pitch-up, the moving earth/sky geometry can leave the outer circular bezel,
-revealing that the horizon is a translated object rather than a correctly
-clipped circular display. The PFD attitude also did not consistently match the
-physical flight state. The right-side pitch, bank, and other physics values did
-track well enough to take off and turn, so preserve those as the diagnostic
-reference while correcting the PFD mask/geometry and attitude mapping.
+For the next live test, first confirm the right-side debug block says
+`XR SYNCED`. Compare the PFD directly with the numeric PITCH/BANK/ALT values:
+pitch-up must move the horizon downward, bank must rotate the horizon opposite
+the aircraft bank, and no sky/earth or pitch mark may leave the circular disc.
+Also confirm that HMD translation/rotation remains smooth while pedalling and
+turning. The older geometry escaped the circular bezel; the fixed GPU disc is
+intended to eliminate that failure and now needs HMD verification.
 
 Terrain may also be prepared as a visual reference, but its authoring source
 should remain in Blender 5.2 LTS. Make a separate copy before opening or saving
@@ -41,21 +41,18 @@ scope here.
 
 ## Working baseline
 
-- Arrietty-UP version: `0.13.1-up.3`
+- Arrietty-UP version: `0.13.1-up.4`
 - Public repository: https://github.com/ysk424/Arrietty-UP
-- Accepted and pushed panel baseline: `2688f33`
+- Accepted and pushed working baseline: `58c0031`
 - Standard Blender: locally built Blender 5.2.0 LTS
 - UPBGE build base: Blender 5.3.0 Alpha / UPBGE 0.53
 - Standard Blender MCP: `127.0.0.1:9876`
 - UPBGE MCP: `127.0.0.1:9877`
 
-Launch OpenXR and enter the UPBGE game once from PowerShell with:
+After starting SteamVR, launch OpenXR and enter the game once with:
 
 ```powershell
-& "C:\Users\azoo\git\build_upbge_windows_Release_x64_vc17_Release\bin\blender.exe" `
-  --online-mode --start-console `
-  "C:\Users\azoo\git\Arrietty-UP\Arrietty-UP.blend" `
-  --python "C:\Users\azoo\git\Arrietty-UP\tools\launch_openxr_game.py"
+& "C:\Users\azoo\git\Arrietty-UP\tools\launch_live_test.ps1"
 ```
 
 The launcher starts the persistent OpenXR session before entering the game, so
@@ -65,7 +62,8 @@ border while running is expected.
 ## Live hardware result
 
 The morning flight run on 2026-09-03 was accepted as a **working baseline with
-the known PFD issue above**.
+the previous moving-geometry PFD issue**. The next-test build addresses it but
+has not yet been accepted in the HMD.
 
 - OpenXR appeared in the HMD and the game entered exactly once.
 - CYCPLUS T2 and the wired controller connected; the last controller port was
@@ -105,6 +103,7 @@ The local UPBGE OpenXR fix restores the View3D context after XR notifier
 handling in `source/gameengine/Ketsji/KX_Scene.cpp`.
 
 - Local UPBGE fix commit: `6f0e68ccbb60e3b666025c75a49b7b0b769f7ed2`
+- Native game-side OpenXR bridge commit: `7b63ea539c`
 - Private compact recovery snapshot: https://github.com/ysk424/upbge
 - Public upstream report: https://github.com/UPBGE/upbge/issues/2044
 
@@ -129,10 +128,11 @@ Run Blender-independent tests with:
 python3 -m unittest discover -s tests -v
 ```
 
-The current baseline has 57 passing tests, including panel formatting, PFD
+The current next-test build has 60 passing tests, including a source-boundary
+test that rejects any `bpy` import under `arrietty_up`, panel formatting, PFD
 attitude transforms, button chord handling, VIVE steering math, voice protocol,
 HMD alignment math, and the connected flight runtime. Remaining integrations
-include the PFD corrections described above, ride CSV, course-surface collision,
-resistance-preset selection, and VR alerts.
+include live verification of the C++ OpenXR bridge and fixed-disc PFD, ride CSV,
+course-surface collision, resistance-preset selection, and VR alerts.
 
 Preserve unrelated user work in `../Arrietty` and `../Secret-World`.

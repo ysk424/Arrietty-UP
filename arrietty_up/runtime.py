@@ -90,6 +90,8 @@ class RuntimeState:
     hmd_alignment_degrees: float = 0.0
     hmd_alignment_pending_until_seconds: float = 0.0
     hmd_alignment_message: str = "WAITING FOR BUTTON 1"
+    xr_bridge_status: str = "NOT CHECKED"
+    xr_navigation_synced: bool = False
     last_mode_action: str = "GROUND"
     last_flight_event: str = ""
     last_control_message: str = ""
@@ -583,21 +585,28 @@ def _unwind_degrees(value: float) -> float:
     return result
 
 
-def _sync_xr_navigation(runtime: RuntimeState) -> None:
-    """Apply the ride transform to Blender's persistent OpenXR viewpoint."""
+def _sync_xr_navigation(runtime: RuntimeState, game_object, logic) -> bool:
+    """Ask UPBGE's C++ bridge to copy the game-object pose into OpenXR."""
+    previous_status = runtime.xr_bridge_status
     try:
-        import bpy
-
-        xr_state = bpy.context.window_manager.xr_session_state
-        xr_state.navigation_location = (
-            runtime.position_x_meters,
-            runtime.position_y_meters,
-            runtime.flight.altitude_meters,
+        synced = bool(
+            logic.syncOpenXRNavigation(
+                game_object,
+                runtime.hmd_alignment_degrees,
+            )
         )
-        xr_state.navigation_rotation = _navigation_orientation(runtime)
     except (AttributeError, RuntimeError):
-        # Desktop-only runs do not have an active XR session state.
-        pass
+        runtime.xr_bridge_status = "C++ BRIDGE MISSING"
+        runtime.xr_navigation_synced = False
+        if runtime.xr_bridge_status != previous_status:
+            print(f"ARRIETTY_OPENXR_BRIDGE {runtime.xr_bridge_status}", flush=True)
+        return False
+
+    runtime.xr_navigation_synced = synced
+    runtime.xr_bridge_status = "SYNCED" if synced else "WAITING FOR OPENXR"
+    if runtime.xr_bridge_status != previous_status:
+        print(f"ARRIETTY_OPENXR_BRIDGE {runtime.xr_bridge_status}", flush=True)
+    return synced
 
 
 def _vehicle_orientation(runtime: RuntimeState):
@@ -615,15 +624,6 @@ def _vehicle_orientation(runtime: RuntimeState):
         (0.0, 1.0, 0.0), math.radians(-runtime.flight.bank_degrees)
     )
     return (heading @ pitch @ bank).to_matrix()
-
-
-def _navigation_orientation(runtime: RuntimeState):
-    from mathutils import Quaternion
-
-    alignment = Quaternion(
-        (0.0, 0.0, 1.0), math.radians(runtime.hmd_alignment_degrees)
-    )
-    return alignment @ _vehicle_orientation(runtime).to_quaternion()
 
 
 def _quaternion_forward_heading_degrees(rotation) -> float | None:
@@ -647,21 +647,23 @@ def _quaternion_z_rotation_degrees(rotation) -> float:
     )
 
 
-def _try_align_hmd_to_bike(runtime: RuntimeState, now: float) -> bool:
+def _try_align_hmd_to_bike(runtime: RuntimeState, now: float, logic) -> bool:
     if runtime.hmd_aligned or now > runtime.hmd_alignment_pending_until_seconds:
         return runtime.hmd_aligned
     try:
-        import bpy
-
-        xr_state = bpy.context.window_manager.xr_session_state
+        viewer_rotation = logic.getOpenXRViewerRotation()
+        navigation_rotation = logic.getOpenXRNavigationRotation()
+        if viewer_rotation is None or navigation_rotation is None:
+            runtime.hmd_alignment_message = "WAITING FOR VALID OPENXR HMD POSE"
+            return False
         viewer_heading = _quaternion_forward_heading_degrees(
-            xr_state.viewer_pose_rotation
+            viewer_rotation
         )
         if viewer_heading is None:
             runtime.hmd_alignment_message = "HMD FORWARD POSE IS NOT VALID"
             return False
         navigation_heading = _quaternion_z_rotation_degrees(
-            xr_state.navigation_rotation
+            navigation_rotation
         )
         correction = _unwind_degrees(
             runtime.heading_degrees - viewer_heading
@@ -677,20 +679,16 @@ def _try_align_hmd_to_bike(runtime: RuntimeState, now: float) -> bool:
             f"HMD ALIGNED {runtime.hmd_alignment_degrees:+.1f} DEG"
         )
         return True
-    except (ImportError, AttributeError, RuntimeError):
+    except (AttributeError, RuntimeError, TypeError, ValueError):
         runtime.hmd_alignment_message = "WAITING FOR VALID OPENXR HMD POSE"
         return False
 
 
-def _reset_xr_navigation() -> None:
+def _reset_xr_navigation(logic) -> bool:
     try:
-        import bpy
-
-        xr_state = bpy.context.window_manager.xr_session_state
-        xr_state.navigation_location = (0.0, 0.0, 0.0)
-        xr_state.navigation_rotation = (1.0, 0.0, 0.0, 0.0)
+        return bool(logic.resetOpenXRNavigation())
     except (AttributeError, RuntimeError):
-        pass
+        return False
 
 
 def reset() -> RuntimeState:
@@ -724,6 +722,7 @@ def tick(controller) -> None:
         owner["ride_active"] = False
         owner["bluetooth_status"] = "IDLE"
         owner["heart_rate_status"] = "DISCONNECTED"
+        owner["xr_bridge_status"] = "NOT CHECKED"
         runtime.fan.start()
         runtime.serial.start()
         runtime.steering.start()
@@ -821,7 +820,7 @@ def tick(controller) -> None:
     runtime.flush_flight_button(now)
     runtime.update_sensor_state(now)
     runtime.update_steering_state()
-    _try_align_hmd_to_bike(runtime, now)
+    _try_align_hmd_to_bike(runtime, now, bge.logic)
     voice_status = runtime.voice.poll()
     if voice_status is not None:
         runtime.voice_status = voice_status[0]
@@ -904,7 +903,8 @@ def tick(controller) -> None:
         runtime.flight.altitude_meters,
     )
     owner.worldOrientation = _vehicle_orientation(runtime)
-    _sync_xr_navigation(runtime)
+    _sync_xr_navigation(runtime, owner, bge.logic)
+    owner["xr_bridge_status"] = runtime.xr_bridge_status
     runtime.fan.tick(runtime.speed_kmh if runtime.ride_active else 0.0, now)
     owner["fan_status"] = runtime.fan.status
     owner["fan_requested_level"] = runtime.fan.requested_level
@@ -925,7 +925,7 @@ def tick(controller) -> None:
         runtime.ending = True
         owner["arrietty_status"] = "STOPPING"
         runtime.stop_services()
-        _reset_xr_navigation()
+        _reset_xr_navigation(bge.logic)
         print("ARRIETTY_UP_RUNTIME_STOPPED", flush=True)
         bge.logic.endGame()
 

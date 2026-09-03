@@ -7,6 +7,9 @@ from arrietty_up.runtime import (
     RuntimeState,
     _quaternion_forward_heading_degrees,
     _quaternion_z_rotation_degrees,
+    _reset_xr_navigation,
+    _sync_xr_navigation,
+    _try_align_hmd_to_bike,
 )
 
 
@@ -48,6 +51,26 @@ class FakeVoice:
 
     def close(self):
         pass
+
+
+class FakeOpenXRLogic:
+    def __init__(self):
+        self.sync_args = None
+        self.reset_count = 0
+
+    def syncOpenXRNavigation(self, game_object, alignment_degrees):
+        self.sync_args = (game_object, alignment_degrees)
+        return True
+
+    def getOpenXRViewerRotation(self):
+        return (0.5, -0.5, -0.5, 0.5)
+
+    def getOpenXRNavigationRotation(self):
+        return (1.0, 0.0, 0.0, 0.0)
+
+    def resetOpenXRNavigation(self):
+        self.reset_count += 1
+        return True
 
 
 class RuntimeStateTests(unittest.TestCase):
@@ -347,6 +370,23 @@ class RuntimeStateTests(unittest.TestCase):
             _quaternion_z_rotation_degrees((root_half, 0, 0, root_half)),
             90.0,
         )
+
+    def test_cpp_openxr_bridge_sync_alignment_and_reset(self):
+        state = self.make_state()
+        state.hmd_alignment_degrees = -12.5
+        owner = object()
+        logic = FakeOpenXRLogic()
+
+        self.assertTrue(_sync_xr_navigation(state, owner, logic))
+        self.assertEqual(logic.sync_args, (owner, -12.5))
+        self.assertTrue(state.xr_navigation_synced)
+        self.assertEqual(state.xr_bridge_status, "SYNCED")
+
+        state.hmd_alignment_pending_until_seconds = 2.0
+        self.assertTrue(_try_align_hmd_to_bike(state, 1.0, logic))
+        self.assertAlmostEqual(state.hmd_alignment_degrees, -90.0)
+        self.assertTrue(_reset_xr_navigation(logic))
+        self.assertEqual(logic.reset_count, 1)
 
 
 if __name__ == "__main__":
