@@ -517,6 +517,19 @@ class RuntimeState:
         self.record_recovery_pose(advance)
         return advance
 
+    def fan_apparent_speed_kmh(self) -> float:
+        """Return rider-relative airflow for the physical fan.
+
+        Ground mode follows bicycle ground speed. In flight it follows the
+        simulated glider airspeed, so airflow continues while gliding even
+        when T2 cadence or wheel speed falls.
+        """
+        if not self.ride_active:
+            return 0.0
+        if self.flight_enabled:
+            return max(0.0, self.flight.airspeed_meters_per_second * 3.6)
+        return max(0.0, self.ground_speed_kmh)
+
     def update_steering_state(self) -> None:
         snapshot = self.steering.snapshot()
         self.steering_tracking = snapshot.tracking
@@ -607,6 +620,14 @@ def _unwind_degrees(value: float) -> float:
     elif result < -180.0:
         result += 360.0
     return result
+
+
+def _initial_heading_degrees(game_object) -> float:
+    try:
+        heading = float(game_object.get("initial_heading_degrees", 0.0))
+    except (AttributeError, TypeError, ValueError):
+        return 0.0
+    return _unwind_degrees(heading) if math.isfinite(heading) else 0.0
 
 
 def _sync_xr_navigation(runtime: RuntimeState, game_object, logic) -> bool:
@@ -735,6 +756,7 @@ def tick(controller) -> None:
     runtime.frame_count += 1
 
     if runtime.frame_count == 1:
+        runtime.heading_degrees = _initial_heading_degrees(owner)
         owner["arrietty_status"] = "RUNNING"
         owner["arrietty_version"] = c.VERSION
         owner["controller_status"] = "STARTING"
@@ -929,12 +951,41 @@ def tick(controller) -> None:
     owner.worldOrientation = _vehicle_orientation(runtime)
     _sync_xr_navigation(runtime, owner, bge.logic)
     owner["xr_bridge_status"] = runtime.xr_bridge_status
-    runtime.fan.tick(runtime.speed_kmh if runtime.ride_active else 0.0, now)
+    fan_before = (
+        runtime.fan.status,
+        runtime.fan.requested_level,
+        runtime.fan.reported_level,
+    )
+    fan_speed_kmh = runtime.fan_apparent_speed_kmh()
+    runtime.fan.tick(fan_speed_kmh, now)
+    fan_after = (
+        runtime.fan.status,
+        runtime.fan.requested_level,
+        runtime.fan.reported_level,
+    )
+    if fan_after != fan_before:
+        print(
+            "ARRIETTY_FAN "
+            f"speed={fan_speed_kmh:.1f}km/h "
+            f"requested={runtime.fan.requested_level} "
+            f"reported={runtime.fan.reported_level} "
+            f"status={runtime.fan.status}",
+            flush=True,
+        )
     owner["fan_status"] = runtime.fan.status
+    owner["fan_connected"] = runtime.fan.connected
+    owner["fan_speed_kmh"] = fan_speed_kmh
     owner["fan_requested_level"] = runtime.fan.requested_level
     owner["fan_reported_level"] = (
         -1 if runtime.fan.reported_level is None else runtime.fan.reported_level
     )
+    fan_response_age = runtime.fan.response_age_seconds(now)
+    owner["fan_response_age_seconds"] = (
+        -1.0 if fan_response_age is None else fan_response_age
+    )
+    owner["fan_packets_sent"] = runtime.fan.packets_sent
+    owner["fan_packets_received"] = runtime.fan.packets_received
+    owner["fan_invalid_responses"] = runtime.fan.invalid_responses
 
     owner["arrietty_frames"] = runtime.frame_count
     owner["arrietty_delta_ms"] = round(delta * 1000.0, 3)

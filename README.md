@@ -9,6 +9,18 @@ steering, wired ESP32 control panel, ESP32 fan, instrument, ride log, and
 voice-PTT behavior. Cesium is not part of this repository; geographic world
 streaming belongs to `../Secret-World`.
 
+## Start
+
+Start SteamVR, power the bicycle equipment, and run this from PowerShell:
+
+```powershell
+.\start.ps1
+```
+
+The root launcher checks SteamVR and residual Blender processes, opens the
+accepted `Arrietty-UP.blend` with the locally built UPBGE, starts persistent
+OpenXR, and enters the game. No manual `P` press is required.
+
 ## Runtime boundary
 
 - `bpy` is used only by authoring/build/startup tools, never by the game-frame
@@ -65,8 +77,55 @@ OpenXR navigation now uses the compiled
 debug block must show `XR SYNCED`; `C++ BRIDGE MISSING` means the wrong UPBGE
 binary was launched.
 
-The next simulator task is the fan. World scenery, islands, flight rings, and
-locations such as New York belong in `../Secret-World`, not this repository.
+The physical fan, the final simulator integration, passed its focused hardware
+acceptance on 2026-09-03. The Arrietty-UP simulator milestone is complete.
+The copied `Tuval-1.blend` is installed as the initial Funafuti runway world.
+Further scenery authoring, flight rings, and locations such as New York belong
+in `../Secret-World`; Arrietty-UP keeps only the accepted runtime snapshot.
+
+## Initial Tuvalu world
+
+`Tuval-1.blend` is an unchanged copy of
+`../Arrietty/test_data/Tuval-1.blend`. Its `Secret World` collection and
+Funafuti sky are appended to the UPBGE runtime scene. The derived scene shifts
+the 1.46 m runway elevation to Z=0, starts at its center facing along runway
+03-21, extends the camera range to 250 km, and tags five imported ground
+objects as ride surfaces. The original Blender 5.2 LTS source copy remains
+unchanged; only `Arrietty-UP.blend` is saved in UPBGE's Blender 5.3 format.
+
+Reinstall the copied world after a full scene rebuild with:
+
+```powershell
+& "C:\Users\azoo\git\build_upbge_windows_Release_x64_vc17_Release\bin\blender.exe" `
+  --background ".\Arrietty-UP.blend" `
+  --python ".\tools\install_tuval_world.py"
+```
+
+## Physical fan
+
+The ESP32-IR controller is reached over UDP at `192.168.4.1:4210` while the PC
+is connected to the `Arrietty-Fan` Wi-Fi network. Airflow maps 0–30 km/h to
+levels 0–6. Ground mode follows bicycle ground speed; flight mode follows
+simulated glider airspeed, including unpowered gliding.
+
+Fan I/O is nonblocking and does not use `bpy`. The runtime waits for the
+ESP32's `OK LEVEL` acknowledgement without flooding commands during its slow
+IR level transition, reports requested/actual levels on the panel, retries a
+missing response, and sends `LEVEL 0` three times during shutdown.
+
+With the bicycle/game stopped, test the physical controller from Windows:
+
+```powershell
+py -3 .\tools\test_fan_hardware.py --levels 0 1 2 3 4 5 6 0
+```
+
+The test requires an acknowledgement for every level and always requests
+level 0 in its cleanup path. Running it without `--levels` performs only the
+safe level-0 connection check.
+
+The accepted hardware run commanded `0→1→2→3→4→5→6→0`. The ESP32 acknowledged
+every level, each IR step completed in approximately 1.69 seconds, the rider
+observed the same physical sequence, and the fan stopped at level 0.
 
 ## Wired controls
 
@@ -121,5 +180,5 @@ python3 -m unittest discover -s tests -v
 For a live test, start SteamVR first and then run:
 
 ```powershell
-& "C:\Users\azoo\git\Arrietty-UP\tools\launch_live_test.ps1"
+.\start.ps1
 ```

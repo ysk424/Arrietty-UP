@@ -75,4 +75,11 @@ result = {
     "voice_status": state.voice_status,
     "voice_detail": state.voice.detail,
     "fan_status": state.fan.status,
+    "fan_connected": state.fan.connected,
+    "fan_apparent_speed_kmh": round(state.fan_apparent_speed_kmh(), 3),
+    "fan_requested_level": state.fan.requested_level,
+    "fan_reported_level": state.fan.reported_level,
+    "fan_packets_sent": state.fan.packets_sent,
+    "fan_packets_received": state.fan.packets_received,
+    "fan_invalid_responses": state.fan.invalid_responses,
 }

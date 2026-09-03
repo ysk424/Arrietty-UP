@@ -2,35 +2,38 @@
 
 Last updated: 2026-09-03 (Asia/Tokyo)
 
-The panel, compiled C++ OpenXR bridge, PFD, and human-powered flight controls
-were accepted in live OpenXR tests on 2026-09-03. The next simulator task is
-the fan. After that, scenery work moves to `../Secret-World`.
+The panel, compiled C++ OpenXR bridge, PFD, human-powered flight controls, and
+physical fan were accepted in live tests on 2026-09-03. The Arrietty-UP
+simulator milestone is complete. Scenery work now moves to `../Secret-World`.
+The copied `Tuval-1.blend` is the accepted initial screen: the rider starts at
+Z=0 in the center of the Funafuti runway, facing along runway 03-21.
 
 The agreed aircraft model is a human-powered glider with two ailerons, paired
 elevator surfaces that move together, a rudder, and a pedal-driven pusher
 propeller behind the pilot. Preserve that control and geometry model in future
 work.
 
-## Next task
+## Next repository
 
-Work from `C:\Users\azoo\git\Arrietty-UP`.
+Continue world and scenery work from `C:\Users\azoo\git\Secret-World`.
+The Arrietty-UP details below are retained as the accepted simulator reference.
+Launch that reference from `C:\Users\azoo\git\Arrietty-UP` with `./start.ps1`.
 
 The VR instrument panel is authored in the UPBGE scene and its placement was
 accepted in OpenXR. The first live adjustment moved it
 from 1.0 m to 1.3 m forward and increased its upward tilt from 26.565 to 46.565
 degrees while retaining the 1.0 m center height. Its right-side debug block was
-expanded to show steering, flight commands, tuning, and voice status. Confirm
-that those small dynamic values remain readable in both eyes.
+expanded to show steering, flight commands, tuning, voice, and fan status.
 
 There are no numeric-keypad runtime controls. Start with
 `tools/launch_live_test.ps1` as shown below. With the HMD facing the physical
 bicycle direction and the handle centered, use Button 1 to align/start.
 
-Finish and accept the fan behavior. The integrated fan has reacted to speed in
-an earlier run, but it is the remaining simulator item selected by the user for
-focused completion. Keep its I/O nonblocking and verify commanded/reported fan
-levels against ground and flight speed without adding `bpy` to the game-frame
-path.
+The completed fan behavior passed hardware acceptance. The current runtime
+uses ground speed while riding and simulated airspeed while flying, waits for
+slow IR transitions without UDP flooding, exposes command/response diagnostics,
+and sends a three-packet level 0 safety stop. `bpy` remains forbidden from the
+game-frame path.
 
 Terrain may also be prepared as a visual reference, but its authoring source
 should remain in Blender 5.2 LTS. Make a separate copy before opening or saving
@@ -43,7 +46,7 @@ scope here.
 
 ## Working baseline
 
-- Arrietty-UP version: `0.13.1-up.5`
+- Arrietty-UP version: `0.13.1-up.7`
 - Public repository: https://github.com/ysk424/Arrietty-UP
 - Accepted working baseline: current `main` HEAD
 - Standard Blender: locally built Blender 5.2.0 LTS
@@ -54,7 +57,7 @@ scope here.
 After starting SteamVR, launch OpenXR and enter the game once with:
 
 ```powershell
-& "C:\Users\azoo\git\Arrietty-UP\tools\launch_live_test.ps1"
+& "C:\Users\azoo\git\Arrietty-UP\start.ps1"
 ```
 
 The launcher starts the persistent OpenXR session before entering the game, so
@@ -62,6 +65,16 @@ no `P` press is required. `Esc` leaves the game. A darker rectangular game
 border while running is expected.
 
 ## Live hardware result
+
+The focused fan run on 2026-09-03 was accepted as **PASS**.
+
+- Windows connected to `Arrietty-Fan` as `192.168.4.2`.
+- A safe level-0 probe received `CONNECTED LEVEL 0` before moving the fan.
+- The commanded and observed physical sequence was `0→1→2→3→4→5→6→0`.
+- Every ESP32 acknowledgement was received; each one-level IR transition took
+  approximately 1.69 seconds.
+- The final level-0 acknowledgement was followed by three additional level-0
+  safety datagrams.
 
 The afternoon flight run on 2026-09-03 was accepted as **PASS**.
 
@@ -142,11 +155,14 @@ Run Blender-independent tests with:
 python3 -m unittest discover -s tests -v
 ```
 
-The accepted build has 60 passing tests, including a source-boundary
+The current build has 67 passing tests, including a source-boundary
 test that rejects any `bpy` import under `arrietty_up`, panel formatting, PFD
 attitude transforms, button chord handling, VIVE steering math, voice protocol,
 HMD alignment math, pre-takeoff aileron feedback, and the connected flight
-runtime. The next focused integration is the fan. Scenery and flight-ring work
-belong in `../Secret-World`.
+runtime. Fan protocol, slow-transition retry, diagnostics, safe shutdown, and
+ground/flight airflow selection are also covered. Fan hardware acceptance is
+complete. The production blend validator also checks the copied Tuvalu source
+hash, Funafuti world, runway elevation/heading, active camera, and five ride
+surfaces. Scenery and flight-ring work belong in `../Secret-World`.
 
 Preserve unrelated user work in `../Arrietty` and `../Secret-World`.

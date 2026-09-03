@@ -11,3 +11,8 @@ license file, and original license terms.
 
 These components are independent libraries and are not relicensed under the
 Arrietty-UP MIT License.
+
+The copied `Tuval-1.blend` contains Funafuti geographic features derived from
+OpenStreetMap data. Its embedded source manifest records © OpenStreetMap
+contributors, ODbL 1.0, and https://www.openstreetmap.org/copyright. The file
+contains no Google-derived data.

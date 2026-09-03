@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
+from pathlib import Path
+
 import bpy
 
 
@@ -14,6 +17,9 @@ if scene.get("instrument_panel_version") != 3:
     _fail("instrument panel version is not 3")
 required_objects = (
     "ArriettyRuntime",
+    "ArriettyCamera",
+    "ArriettyTuvalInstall",
+    "Funafuti Runway 03-21",
     "InstrumentPanelRoot",
     "Instrument_PFD_Attitude",
     "Instrument_PFD_Sky",
@@ -29,6 +35,36 @@ required_objects = (
 missing = [name for name in required_objects if scene.objects.get(name) is None]
 if missing:
     _fail(f"missing objects: {missing}")
+
+if scene.get("arrietty_initial_world") != "TUVALU_FUNAFUTI":
+    _fail("Tuvalu/Funafuti is not the initial world")
+source_blend = Path(bpy.data.filepath).parent / "Tuval-1.blend"
+if not source_blend.is_file():
+    _fail("copied Tuval-1.blend is absent")
+source_hash = hashlib.sha256(source_blend.read_bytes()).hexdigest()
+if source_hash != scene.get("arrietty_world_source_sha256"):
+    _fail("Tuval-1.blend does not match the installed world source")
+if scene.world is None or not scene.world.get("arrietty_tuval_installed"):
+    _fail("Tuvalu sky world is not active")
+
+runtime = scene.objects["ArriettyRuntime"]
+camera = scene.objects["ArriettyCamera"]
+if abs(float(runtime.get("initial_heading_degrees", 0.0)) + 43.075085) > 1.0e-4:
+    _fail("initial heading is not aligned with the Funafuti runway")
+if scene.camera != camera or camera.data.clip_end < 200000.0:
+    _fail("initial camera is not configured for the Tuvalu world")
+runway = scene.objects["Funafuti Runway 03-21"]
+runway_z = sum((runway.matrix_world @ vertex.co).z for vertex in runway.data.vertices)
+runway_z /= len(runway.data.vertices)
+if abs(runway_z) > 1.0e-4:
+    _fail("Funafuti runway surface is not aligned to Z=0")
+ride_surfaces = [
+    obj for obj in scene.objects if obj.get("SecretWorldRideSurface")
+]
+if len(ride_surfaces) != 5:
+    _fail(f"expected 5 Tuvalu ride surfaces, found {len(ride_surfaces)}")
+if scene.objects.get("SecretWorldRideSurface") is not None:
+    _fail("placeholder ride plane was not removed")
 
 attitude = scene.objects["Instrument_PFD_Attitude"]
 if attitude.get("pfd_render_path") != "CIRCULAR_MASKED_GEOMETRY":
@@ -70,6 +106,9 @@ print(
         "mask_vertices": len(clip_mask.data.vertices),
         "mask_faces": len(clip_mask.data.polygons),
         "empty_game_strings": 0,
+        "initial_world": scene.get("arrietty_initial_world"),
+        "ride_surfaces": len(ride_surfaces),
+        "runway_z": round(runway_z, 6),
     },
     flush=True,
 )

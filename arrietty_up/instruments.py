@@ -100,7 +100,10 @@ def build_readout(runtime, delta_seconds: float) -> InstrumentReadout:
             f"STR {steering_status} {steering_degrees:+.1f}",
             f"CMD P{command_pitch:+.0f} R{command_roll:+.0f}",
             tuning_status,
-            f"FAN {runtime.fan.requested_level}/{reported_fan}",
+            (
+                f"FAN {runtime.fan.requested_level}/{reported_fan} "
+                f"{runtime.fan.short_status}"
+            ),
             f"VOICE {getattr(runtime, 'voice_status', 'IDLE')}",
             f"XR {getattr(runtime, 'xr_bridge_status', 'UNKNOWN')}",
             f"FRAME {max(0.0, delta_seconds) * 1000.0:4.1f} ms",

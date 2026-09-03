@@ -123,9 +123,13 @@ sun.rotation_euler = (math.radians(28.0), math.radians(-22.0), math.radians(35.0
 sun.data.energy = 2.2
 
 bpy.ops.wm.save_as_mainfile(filepath=str(OUTPUT), check_existing=False)
+from tools.install_tuval_world import install as install_tuval_world
+
+tuval_result = install_tuval_world(OUTPUT.parent / "Tuval-1.blend", OUTPUT)
 result = {
     "saved": str(OUTPUT),
     "objects": len(scene.objects),
     "controller": controller.module,
     "viewport_render": scene.game_settings.use_viewport_render,
+    "initial_world": tuval_result["source"],
 }

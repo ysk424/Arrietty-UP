@@ -5,6 +5,7 @@ from arrietty_up.controller_protocol import ButtonTransition, ControllerSample
 from arrietty_up.models import CscSample, TrainerSample
 from arrietty_up.runtime import (
     RuntimeState,
+    _initial_heading_degrees,
     _quaternion_forward_heading_degrees,
     _quaternion_z_rotation_degrees,
     _reset_xr_navigation,
@@ -360,6 +361,19 @@ class RuntimeStateTests(unittest.TestCase):
         self.assertGreater(state.flight.altitude_meters, 0.0)
         self.assertEqual(state.propulsion_power_watts, 140.0)
 
+    def test_fan_uses_ground_speed_then_glider_airspeed(self):
+        state = self.make_state()
+        state.ground_speed_kmh = 18.0
+        self.assertEqual(state.fan_apparent_speed_kmh(), 0.0)
+
+        state.ride_active = True
+        self.assertEqual(state.fan_apparent_speed_kmh(), 18.0)
+
+        state.flight_enabled = True
+        state.flight.airspeed_meters_per_second = 10.0
+        state.ground_speed_kmh = 0.0
+        self.assertEqual(state.fan_apparent_speed_kmh(), 36.0)
+
     def test_xr_quaternion_heading_helpers_follow_scene_forward(self):
         self.assertAlmostEqual(
             _quaternion_forward_heading_degrees((0.5, -0.5, -0.5, 0.5)),
@@ -369,6 +383,17 @@ class RuntimeStateTests(unittest.TestCase):
         self.assertAlmostEqual(
             _quaternion_z_rotation_degrees((root_half, 0, 0, root_half)),
             90.0,
+        )
+
+    def test_scene_initial_heading_is_validated_and_unwound(self):
+        self.assertEqual(_initial_heading_degrees({}), 0.0)
+        self.assertEqual(
+            _initial_heading_degrees({"initial_heading_degrees": 315.0}),
+            -45.0,
+        )
+        self.assertEqual(
+            _initial_heading_degrees({"initial_heading_degrees": "invalid"}),
+            0.0,
         )
 
     def test_cpp_openxr_bridge_sync_alignment_and_reset(self):
