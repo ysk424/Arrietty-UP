@@ -151,7 +151,9 @@ The three-section instrument panel is fixed to `ArriettyRuntime` (the bicycle
 reference), centered 1.3 m forward at a height of 1.0 m and tilted upward
 46.565 degrees. Its left section shows
 heart rate and T2 power prominently, plus bicycle ground speed, applied T2
-grade, and mode. The center is a PFD with vertical airspeed and altitude tapes;
+grade, mode, and elapsed time from Button 1 start. The elapsed clock begins at
+`0:00:00` and continues through ground and flight modes. The center is a PFD
+with vertical airspeed and altitude tapes;
 its artificial horizon and pitch ladder move as ordinary UPBGE meshes behind a
 fixed opaque circular annulus. The annulus and outer bezel are coplanar, so the
 earth/sky presentation stays inside and centered in the aperture from an HMD

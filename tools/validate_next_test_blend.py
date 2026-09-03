@@ -13,14 +13,15 @@ def _fail(message: str) -> None:
 
 
 scene = bpy.context.scene
-if scene.get("instrument_panel_version") != 3:
-    _fail("instrument panel version is not 3")
+if scene.get("instrument_panel_version") != 4:
+    _fail("instrument panel version is not 4")
 required_objects = (
     "ArriettyRuntime",
     "ArriettyCamera",
     "ArriettyTuvalInstall",
     "Funafuti Runway 03-21",
     "InstrumentPanelRoot",
+    "Instrument_ElapsedValue",
     "Instrument_PFD_Attitude",
     "Instrument_PFD_Sky",
     "Instrument_PFD_Ground",
@@ -65,6 +66,13 @@ if len(ride_surfaces) != 5:
     _fail(f"expected 5 Tuvalu ride surfaces, found {len(ride_surfaces)}")
 if scene.objects.get("SecretWorldRideSurface") is not None:
     _fail("placeholder ride plane was not removed")
+
+elapsed = scene.objects["Instrument_ElapsedValue"]
+elapsed_property = next(
+    (prop for prop in elapsed.game.properties if prop.name == "Text"), None
+)
+if elapsed_property is None or elapsed_property.value != "0:00:00":
+    _fail("elapsed display does not begin at 0:00:00")
 
 attitude = scene.objects["Instrument_PFD_Attitude"]
 if attitude.get("pfd_render_path") != "CIRCULAR_MASKED_GEOMETRY":

@@ -97,10 +97,18 @@ class RuntimeStateTests(unittest.TestCase):
 
     def test_start_ride_and_brake_requests(self):
         state = self.make_state()
+        state.ride_elapsed_seconds = 99.0
         self.assertTrue(state.start_ride())
         self.assertEqual(state.bluetooth_generation, 1)
         self.assertEqual(state.bluetooth.start_args, (5, 0.0))
         self.assertTrue(state.ride_active)
+        self.assertEqual(state.ride_elapsed_seconds, 0.0)
+
+        state.ride_started_at_seconds = 100.0
+        state.update_ride_elapsed(161.75)
+        self.assertEqual(state.ride_elapsed_seconds, 61.75)
+        state.update_ride_elapsed(150.0)
+        self.assertEqual(state.ride_elapsed_seconds, 61.75)
 
         state.set_brake_button_held(True)
         state.set_brake_button_held(True)

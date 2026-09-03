@@ -24,6 +24,8 @@ accepted in OpenXR. The first live adjustment moved it
 from 1.0 m to 1.3 m forward and increased its upward tilt from 26.565 to 46.565
 degrees while retaining the 1.0 m center height. Its right-side debug block was
 expanded to show steering, flight commands, tuning, voice, and fan status.
+The left section includes an `ELAPSED H:MM:SS` clock that resets to zero on the
+first Button 1 start and continues through ground and flight modes.
 
 There are no numeric-keypad runtime controls. Start with
 `tools/launch_live_test.ps1` as shown below. With the HMD facing the physical
@@ -46,7 +48,7 @@ scope here.
 
 ## Working baseline
 
-- Arrietty-UP version: `0.13.1-up.7`
+- Arrietty-UP version: `0.13.1-up.8`
 - Public repository: https://github.com/ysk424/Arrietty-UP
 - Accepted working baseline: current `main` HEAD
 - Standard Blender: locally built Blender 5.2.0 LTS
@@ -61,8 +63,10 @@ After starting SteamVR, launch OpenXR and enter the game once with:
 ```
 
 The launcher starts the persistent OpenXR session before entering the game, so
-no `P` press is required. `Esc` leaves the game. A darker rectangular game
-border while running is expected.
+no `P` press is required. `Esc` leaves the game. The startup timer deliberately
+remains registered during the nested game loop, preventing the prior
+`BLI_timer_execute` access violation after returning to Blender. A darker
+rectangular game border while running is expected.
 
 ## Live hardware result
 
@@ -155,14 +159,15 @@ Run Blender-independent tests with:
 python3 -m unittest discover -s tests -v
 ```
 
-The current build has 67 passing tests, including a source-boundary
+The current build has 69 passing tests, including a source-boundary
 test that rejects any `bpy` import under `arrietty_up`, panel formatting, PFD
 attitude transforms, button chord handling, VIVE steering math, voice protocol,
 HMD alignment math, pre-takeoff aileron feedback, and the connected flight
-runtime. Fan protocol, slow-transition retry, diagnostics, safe shutdown, and
-ground/flight airflow selection are also covered. Fan hardware acceptance is
-complete. The production blend validator also checks the copied Tuvalu source
-hash, Funafuti world, runway elevation/heading, active camera, and five ride
-surfaces. Scenery and flight-ring work belong in `../Secret-World`.
+runtime. Elapsed-time reset/formatting and re-entrant launcher-timer safety are
+also covered. Fan protocol, slow-transition retry, diagnostics, safe shutdown,
+and ground/flight airflow selection are also covered. Fan hardware acceptance
+is complete. The production blend validator also checks the copied Tuvalu
+source hash, Funafuti world, runway elevation/heading, active camera, and five
+ride surfaces. Scenery and flight-ring work belong in `../Secret-World`.
 
 Preserve unrelated user work in `../Arrietty` and `../Secret-World`.

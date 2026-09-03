@@ -10,6 +10,7 @@ result = {
     "generation": state.bluetooth_generation,
     "worker_running": state.bluetooth.running,
     "ride_active": state.ride_active,
+    "ride_elapsed_seconds": round(state.ride_elapsed_seconds, 3),
     "hmd_aligned": state.hmd_aligned,
     "hmd_alignment_degrees": round(state.hmd_alignment_degrees, 3),
     "hmd_alignment_message": state.hmd_alignment_message,

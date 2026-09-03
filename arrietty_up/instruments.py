@@ -21,6 +21,7 @@ class InstrumentReadout:
     ground_speed: str
     trainer_grade: str
     mode: str
+    elapsed_time: str
     airspeed: str
     airspeed_ticks: tuple[str, str, str, str]
     altitude: str
@@ -56,6 +57,19 @@ def _tape_ticks(value: float, step: float, *, decimals: int = 0) -> tuple[str, .
     formatter = f"{{:.{decimals}f}}"
     values = (center - 2 * step, center - step, center + step, center + 2 * step)
     return tuple("" if item < 0.0 else formatter.format(item) for item in values)
+
+
+def _format_elapsed_time(elapsed_seconds: float) -> str:
+    try:
+        elapsed = float(elapsed_seconds)
+    except (TypeError, ValueError):
+        elapsed = 0.0
+    if not math.isfinite(elapsed):
+        elapsed = 0.0
+    total_seconds = int(max(0.0, elapsed))
+    hours, remainder = divmod(total_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return f"{hours}:{minutes:02d}:{seconds:02d}"
 
 
 def build_readout(runtime, delta_seconds: float) -> InstrumentReadout:
@@ -115,6 +129,9 @@ def build_readout(runtime, delta_seconds: float) -> InstrumentReadout:
         ground_speed=f"{max(0.0, ground_speed):4.1f} km/h",
         trainer_grade=grade,
         mode=_mode(runtime),
+        elapsed_time=_format_elapsed_time(
+            getattr(runtime, "ride_elapsed_seconds", 0.0)
+        ),
         airspeed=f"{airspeed_kmh:.0f}",
         airspeed_ticks=_tape_ticks(airspeed_kmh, 10.0),
         altitude=(
@@ -176,6 +193,7 @@ def update_upbge_panel(scene, runtime, delta_seconds: float) -> None:
         "Instrument_GroundSpeedValue": readout.ground_speed,
         "Instrument_GradeValue": readout.trainer_grade,
         "Instrument_ModeValue": readout.mode,
+        "Instrument_ElapsedValue": readout.elapsed_time,
         "Instrument_AirspeedValue": readout.airspeed,
         "Instrument_AltitudeValue": readout.altitude,
         "Instrument_PFDHeading": readout.pfd_status,

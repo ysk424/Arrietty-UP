@@ -54,6 +54,7 @@ class RuntimeState:
     ride_active: bool = False
     connection_started_at_seconds: float = 0.0
     ride_started_at_seconds: float = 0.0
+    ride_elapsed_seconds: float = 0.0
     first_motion_after_seconds: float = 0.0
     trainer_found_after_seconds: float = 0.0
     gatt_connected_after_seconds: float = 0.0
@@ -164,6 +165,7 @@ class RuntimeState:
         self.propulsion_power_watts = 0.0
         self.steering.recenter()
         self.ride_started_at_seconds = time.monotonic()
+        self.ride_elapsed_seconds = 0.0
         self.hmd_aligned = False
         self.hmd_alignment_pending_until_seconds = (
             self.ride_started_at_seconds + 1.0
@@ -177,6 +179,15 @@ class RuntimeState:
         self.last_start_action = "STARTED"
         self.ride_active = True
         return True
+
+    def update_ride_elapsed(self, now_seconds: float) -> None:
+        """Advance the displayed clock from the first Button 1 start."""
+        if not self.ride_active or self.ride_started_at_seconds <= 0.0:
+            return
+        self.ride_elapsed_seconds = max(
+            self.ride_elapsed_seconds,
+            now_seconds - self.ride_started_at_seconds,
+        )
 
     def toggle_flight(self) -> bool:
         if not self.ride_active:
@@ -865,6 +876,7 @@ def tick(controller) -> None:
                 )
     runtime.flush_flight_button(now)
     runtime.update_sensor_state(now)
+    runtime.update_ride_elapsed(now)
     runtime.update_steering_state()
     _try_align_hmd_to_bike(runtime, now, bge.logic)
     voice_status = runtime.voice.poll()
@@ -897,6 +909,7 @@ def tick(controller) -> None:
     owner["controller_released_latch"] = runtime.button_edges.released_latch
     owner["controller_transition_count"] = runtime.button_edges.transition_count
     owner["ride_active"] = runtime.ride_active
+    owner["ride_elapsed_seconds"] = runtime.ride_elapsed_seconds
     owner["hmd_aligned"] = runtime.hmd_aligned
     owner["hmd_alignment_degrees"] = runtime.hmd_alignment_degrees
     owner["hmd_alignment_message"] = runtime.hmd_alignment_message

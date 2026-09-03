@@ -245,6 +245,8 @@ def _build_left(panel, white, cyan, red, amber):
     _text("Instrument_GradeValue", panel, "--.- %", (0.385, 0.022, -0.111), 0.018, white)
     _text("Instrument_ModeLabel", panel, "MODE", (x0, 0.022, -0.148), 0.014, white)
     _text("Instrument_ModeValue", panel, "STANDBY", (0.420, 0.022, -0.148), 0.018, amber)
+    _text("Instrument_ElapsedLabel", panel, "ELAPSED", (x0, 0.022, -0.178), 0.013, white)
+    _text("Instrument_ElapsedValue", panel, "0:00:00", (0.420, 0.022, -0.178), 0.016, amber)
 
 
 def _build_pfd(panel, black, dark, white, sky, ground, cyan, amber, magenta):
@@ -387,7 +389,7 @@ def build_panel(scene=None):
     _build_pfd(panel, black, dark, white, sky, ground, cyan, amber, magenta)
     _build_right(panel, white, cyan, amber)
 
-    scene["instrument_panel_version"] = 3
+    scene["instrument_panel_version"] = 4
     scene["instrument_panel_mount"] = "BICYCLE_FIXED"
     return panel
 

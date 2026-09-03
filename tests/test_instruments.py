@@ -21,6 +21,7 @@ class InstrumentTests(unittest.TestCase):
         state.applied_preset = 5
         state.applied_grade_percent = 3.0
         state.cadence_rpm = 81.25
+        state.ride_elapsed_seconds = 65.9
 
         panel = build_readout(state, 1.0 / 60.0)
 
@@ -29,6 +30,7 @@ class InstrumentTests(unittest.TestCase):
         self.assertEqual(panel.ground_speed, "23.4 km/h")
         self.assertEqual(panel.trainer_grade, " 3.0 %")
         self.assertEqual(panel.mode, "RIDE")
+        self.assertEqual(panel.elapsed_time, "0:01:05")
         self.assertIn("ALT      0.0 m", panel.physics)
         self.assertIn("CAD     81.2 rpm", panel.physics)
         self.assertIn("STR IDLE +0.0", panel.debug)
@@ -42,6 +44,15 @@ class InstrumentTests(unittest.TestCase):
         self.assertEqual(panel.heart_rate, "---")
         self.assertEqual(panel.trainer_grade, "--.- %")
         self.assertEqual(panel.mode, "STANDBY")
+        self.assertEqual(panel.elapsed_time, "0:00:00")
+
+    def test_elapsed_time_supports_long_rides_and_invalid_values(self):
+        state = RuntimeState()
+        state.ride_elapsed_seconds = 3661.9
+        self.assertEqual(build_readout(state, 0.0).elapsed_time, "1:01:01")
+
+        state.ride_elapsed_seconds = float("nan")
+        self.assertEqual(build_readout(state, 0.0).elapsed_time, "0:00:00")
 
     def test_flight_tapes_and_mode_use_flight_state(self):
         state = RuntimeState()

@@ -34,11 +34,12 @@ def _view3d_context():
 def _start_openxr_then_game():
     global _attempt, _xr_start_requested, _game_start_requested
     # Entering the game engine pumps Blender events, so this timer can be
-    # invoked again before game_start() returns.  Mark the transition first;
-    # the re-entrant timer call then unregisters itself instead of launching
-    # another game instance.
+    # invoked again before game_start() returns. Mark the transition first.
+    # A re-entrant call must keep the timer alive: unregistering it there frees
+    # the outer callback's storage and crashes in BLI_timer_execute when the
+    # game later returns. The outer call unregisters normally after game exit.
     if _game_start_requested:
-        return None
+        return 3600.0
 
     _attempt += 1
     context = _view3d_context()
