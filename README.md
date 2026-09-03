@@ -61,10 +61,13 @@ active. Runtime properties expose `gatt_connected_after_seconds`,
 
 Live verified: persistent OpenXR game entry/exit, T2 FTMS ground movement,
 Garmin heart rate, wired controls, forward-axis OpenXR navigation, HMD/VIVE
-alignment, adjusted instrument-panel placement, and human-powered takeoff and
-banked turning. The accepted afternoon 2026-09-03 run covered approximately
-841.8 m, took off at 25.1 km/h, stepped the right-aileron bank command from
--1 through -10 degrees, turned as expected, and landed at 21.4 km/h.
+alignment, adjusted instrument-panel placement, the Button 1 elapsed clock,
+and human-powered takeoff and banked turning. The final completion run launched
+through `start.ps1`, took off, landed, and confirmed the elapsed clock begins at
+`0:00:00`; it was accepted as PASS on 2026-09-03. The accepted afternoon run
+covered approximately 841.8 m, took off at 25.1 km/h, stepped the right-aileron
+bank command from -1 through -10 degrees, turned as expected, and landed at
+21.4 km/h.
 
 The aircraft design target is a human-powered glider: two independently
 commanded ailerons, left and right elevator surfaces moving together, a rudder,

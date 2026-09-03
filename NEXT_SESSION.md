@@ -7,6 +7,9 @@ physical fan were accepted in live tests on 2026-09-03. The Arrietty-UP
 simulator milestone is complete. Scenery work now moves to `../Secret-World`.
 The copied `Tuval-1.blend` is the accepted initial screen: the rider starts at
 Z=0 in the center of the Funafuti runway, facing along runway 03-21.
+The final completion run launched from `start.ps1`, took off, landed, and
+confirmed that the Button 1 elapsed clock starts at `0:00:00`; the user marked
+the completed simulator **PASS**.
 
 The agreed aircraft model is a human-powered glider with two ailerons, paired
 elevator surfaces that move together, a rudder, and a pedal-driven pusher
@@ -91,6 +94,8 @@ The afternoon flight run on 2026-09-03 was accepted as **PASS**.
 - The PFD physical aperture mask kept sky, earth, and pitch marks inside the
   circle, and placing the mask and bezel on one depth plane corrected the HMD
   center offset.
+- A final `start.ps1` run took off and landed in the Funafuti world, and the
+  added elapsed clock was accepted as **PASS**.
 - A GPU-node PFD attempted earlier in the same test rendered as a white circle
   in OpenXR and is intentionally not the accepted implementation.
 
