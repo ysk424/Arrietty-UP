@@ -11,6 +11,7 @@ import math
 
 
 PITCH_METERS_PER_DEGREE = 0.004
+PFD_DISPLAY_PITCH_LIMIT_DEGREES = 12.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -136,7 +137,10 @@ def attitude_transform(
     Pitch translation is rotated with the horizon so the pitch ladder remains
     rigidly attached to it during a bank.
     """
-    pitch = max(-30.0, min(30.0, pitch_degrees))
+    pitch = max(
+        -PFD_DISPLAY_PITCH_LIMIT_DEGREES,
+        min(PFD_DISPLAY_PITCH_LIMIT_DEGREES, pitch_degrees),
+    )
     rotation_degrees = -bank_degrees
     rotation = math.radians(rotation_degrees)
     unbanked_z = -pitch * pitch_scale
@@ -144,26 +148,6 @@ def attitude_transform(
         math.sin(rotation) * unbanked_z,
         math.cos(rotation) * unbanked_z,
         rotation_degrees,
-    )
-
-
-def attitude_shader_color(
-    pitch_degrees: float,
-    bank_degrees: float,
-) -> tuple[float, float, float, float]:
-    """Encode attitude for the fixed circular GPU-rendered PFD disc.
-
-    Object color is the low-overhead per-object uniform already carried by
-    UPBGE. Red/green contain the sine/cosine of the apparent horizon rotation;
-    blue contains clamped pitch in the -30..+30 degree display range.
-    """
-    pitch = max(-30.0, min(30.0, pitch_degrees))
-    rotation = math.radians(-bank_degrees)
-    return (
-        0.5 + 0.5 * math.sin(rotation),
-        0.5 + 0.5 * math.cos(rotation),
-        0.5 + pitch / 60.0,
-        1.0,
     )
 
 
@@ -181,7 +165,7 @@ def _set_text(scene, name: str, value: str) -> None:
 
 
 def update_upbge_panel(scene, runtime, delta_seconds: float) -> None:
-    """Update authored text and the fixed-disc PFD attitude uniform."""
+    """Update authored text and the physically masked PFD geometry."""
     readout = build_readout(runtime, delta_seconds)
     fields = {
         "Instrument_HeartRateValue": readout.heart_rate,
@@ -206,10 +190,20 @@ def update_upbge_panel(scene, runtime, delta_seconds: float) -> None:
 
     attitude = _scene_object(scene, "Instrument_PFD_Attitude")
     if attitude is not None:
-        # The disc geometry never leaves the circular aperture. Its material
-        # decodes this object-color uniform and draws sky, earth, horizon and
-        # pitch marks on the GPU.
-        attitude.color = attitude_shader_color(
+        from mathutils import Matrix
+
+        # The sky, earth and pitch marks move together behind a fixed opaque
+        # annulus. The annulus—not a renderer-specific shader—keeps every
+        # moving part inside the circular aperture.
+        shift_x, shift_z, rotation = attitude_transform(
             runtime.flight.pitch_degrees,
             runtime.flight.bank_degrees,
+        )
+        attitude.localPosition = (
+            shift_x,
+            attitude.get("panel_base_y", 0.013),
+            shift_z,
+        )
+        attitude.localOrientation = Matrix.Rotation(
+            math.radians(rotation), 3, "Y"
         )

@@ -48,21 +48,20 @@ active. Runtime properties expose `gatt_connected_after_seconds`,
 ## Port status
 
 Live verified: persistent OpenXR game entry/exit, T2 FTMS ground movement,
-Garmin heart rate, wired controls, speed-driven fan output, forward-axis OpenXR
-navigation, HMD/VIVE alignment, adjusted instrument-panel placement, and
-human-powered takeoff and turning. The morning 2026-09-03 flight used the
-right-side physics values as its reliable attitude reference because the PFD
-presentation did not consistently match the physical flight state.
+Garmin heart rate, wired controls, forward-axis OpenXR navigation, HMD/VIVE
+alignment, adjusted instrument-panel placement, and human-powered takeoff and
+banked turning. The accepted afternoon 2026-09-03 run covered approximately
+841.8 m, took off at 25.1 km/h, stepped the right-aileron bank command from
+-1 through -10 degrees, turned as expected, and landed at 21.4 km/h.
 
-Prepared for the next live run: OpenXR navigation now uses the compiled
+OpenXR navigation now uses the compiled
 `syncOpenXRNavigation`, `getOpenXRViewerRotation`,
 `getOpenXRNavigationRotation`, and `resetOpenXRNavigation` APIs. The runtime
 debug block must show `XR SYNCED`; `C++ BRIDGE MISSING` means the wrong UPBGE
 binary was launched.
 
-Ride CSV, course-surface collision, resistance-preset selection, and VR alerts
-remain to be integrated. This list describes the implementation state; the
-target feature list above is not a claim that those items are already complete.
+The next simulator task is the fan. World scenery, islands, flight rings, and
+locations such as New York belong in `../Secret-World`, not this repository.
 
 ## Wired controls
 
@@ -89,12 +88,13 @@ reference), centered 1.3 m forward at a height of 1.0 m and tilted upward
 46.565 degrees. Its left section shows
 heart rate and T2 power prominently, plus bicycle ground speed, applied T2
 grade, and mode. The center is a PFD with vertical airspeed and altitude tapes;
-its artificial horizon and pitch ladder are drawn in one fixed circular disc by
-a GPU material. Pitch and bank are passed through the UPBGE object-color
-uniform, so the earth/sky geometry cannot leave the aperture. The right section
-shows flight/physical values and runtime diagnostics. The fixed-disc PFD still
-needs live verification against those right-side values before being relied
-upon.
+its artificial horizon and pitch ladder move as ordinary UPBGE meshes behind a
+fixed opaque circular annulus. The annulus and outer bezel are coplanar, so the
+earth/sky presentation stays inside and centered in the aperture from an HMD
+view. This physical mask replaced a GPU-node version that rendered correctly
+on the desktop but appeared as a white circle in OpenXR. The right section
+shows flight/physical values and runtime diagnostics. PFD pitch, bank, altitude,
+centering, and banked flight were accepted in the 2026-09-03 HMD test.
 
 Placement and viewing tilt are live custom-property controls on
 `InstrumentPanelRoot`: `panel_forward_m`, `panel_center_height_m`, and

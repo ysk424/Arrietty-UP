@@ -17,7 +17,8 @@ import bpy
 DEFAULT_OUTPUT = Path(r"C:\Users\azoo\git\Arrietty-UP\Arrietty-UP.blend")
 PANEL_PREFIX = "Instrument_"
 PFD_RADIUS_METERS = 0.132
-PFD_PITCH_METERS_PER_DEGREE = 0.004
+PFD_HORIZON_RADIUS_METERS = 0.190
+PFD_MASK_OUTER_RADIUS_METERS = 0.242
 
 
 def _requested_output() -> Path:
@@ -39,157 +40,6 @@ def _material(name: str, color: tuple[float, float, float, float], emission: flo
         principled.inputs["Emission Color"].default_value = color
         principled.inputs["Emission Strength"].default_value = emission
     return value
-
-
-def _math_socket(nodes, links, operation: str, left, right=None):
-    node = nodes.new("ShaderNodeMath")
-    node.operation = operation
-    if hasattr(left, "is_output"):
-        links.new(left, node.inputs[0])
-    else:
-        node.inputs[0].default_value = left
-    if right is not None:
-        if hasattr(right, "is_output"):
-            links.new(right, node.inputs[1])
-        else:
-            node.inputs[1].default_value = right
-    return node.outputs[0]
-
-
-def _pfd_attitude_material(name, sky_color, ground_color, line_color):
-    """Build a fixed-disc PFD material evaluated entirely by the GPU."""
-    material = bpy.data.materials.get(name) or bpy.data.materials.new(name)
-    material.use_nodes = True
-    material.use_backface_culling = False
-    nodes = material.node_tree.nodes
-    links = material.node_tree.links
-    nodes.clear()
-
-    output = nodes.new("ShaderNodeOutputMaterial")
-    principled = nodes.new("ShaderNodeBsdfPrincipled")
-    principled.inputs["Roughness"].default_value = 0.72
-    principled.inputs["Emission Strength"].default_value = 0.8
-    links.new(principled.outputs["BSDF"], output.inputs["Surface"])
-
-    coordinates = nodes.new("ShaderNodeTexCoord")
-    generated = nodes.new("ShaderNodeSeparateXYZ")
-    links.new(coordinates.outputs["Generated"], generated.inputs[0])
-    object_info = nodes.new("ShaderNodeObjectInfo")
-    attitude = nodes.new("ShaderNodeSeparateColor")
-    attitude.mode = "RGB"
-    links.new(object_info.outputs["Color"], attitude.inputs[0])
-
-    diameter = 2.0 * PFD_RADIUS_METERS
-    x_meters = _math_socket(
-        nodes,
-        links,
-        "MULTIPLY",
-        _math_socket(nodes, links, "SUBTRACT", generated.outputs["X"], 0.5),
-        diameter,
-    )
-    z_meters = _math_socket(
-        nodes,
-        links,
-        "MULTIPLY",
-        _math_socket(nodes, links, "SUBTRACT", generated.outputs["Z"], 0.5),
-        diameter,
-    )
-    sin_bank = _math_socket(
-        nodes,
-        links,
-        "SUBTRACT",
-        _math_socket(nodes, links, "MULTIPLY", attitude.outputs["Red"], 2.0),
-        1.0,
-    )
-    cos_bank = _math_socket(
-        nodes,
-        links,
-        "SUBTRACT",
-        _math_socket(nodes, links, "MULTIPLY", attitude.outputs["Green"], 2.0),
-        1.0,
-    )
-    pitch_meters = _math_socket(
-        nodes,
-        links,
-        "MULTIPLY",
-        _math_socket(nodes, links, "SUBTRACT", attitude.outputs["Blue"], 0.5),
-        60.0 * PFD_PITCH_METERS_PER_DEGREE,
-    )
-
-    # Inverse-rotate the fixed disc coordinate into the moving horizon frame.
-    horizon_z = _math_socket(
-        nodes,
-        links,
-        "ADD",
-        _math_socket(
-            nodes,
-            links,
-            "ADD",
-            _math_socket(nodes, links, "MULTIPLY", sin_bank, x_meters),
-            _math_socket(nodes, links, "MULTIPLY", cos_bank, z_meters),
-        ),
-        pitch_meters,
-    )
-    horizon_x = _math_socket(
-        nodes,
-        links,
-        "SUBTRACT",
-        _math_socket(nodes, links, "MULTIPLY", cos_bank, x_meters),
-        _math_socket(nodes, links, "MULTIPLY", sin_bank, z_meters),
-    )
-
-    sky_mask = _math_socket(nodes, links, "GREATER_THAN", horizon_z, 0.0)
-    base_color = nodes.new("ShaderNodeMixRGB")
-    base_color.blend_type = "MIX"
-    links.new(sky_mask, base_color.inputs[0])
-    base_color.inputs[1].default_value = ground_color
-    base_color.inputs[2].default_value = sky_color
-
-    graphics_mask = _math_socket(
-        nodes,
-        links,
-        "LESS_THAN",
-        _math_socket(nodes, links, "ABSOLUTE", horizon_z),
-        0.002,
-    )
-    abs_horizon_x = _math_socket(nodes, links, "ABSOLUTE", horizon_x)
-    for pitch in (-20, -10, -5, 5, 10, 20):
-        width = 0.080 if abs(pitch) % 10 == 0 else 0.045
-        mark_z = _math_socket(
-            nodes,
-            links,
-            "ABSOLUTE",
-            _math_socket(
-                nodes,
-                links,
-                "SUBTRACT",
-                horizon_z,
-                pitch * PFD_PITCH_METERS_PER_DEGREE,
-            ),
-        )
-        mark_mask = _math_socket(
-            nodes,
-            links,
-            "MULTIPLY",
-            _math_socket(nodes, links, "LESS_THAN", mark_z, 0.0015),
-            _math_socket(nodes, links, "LESS_THAN", abs_horizon_x, width / 2.0),
-        )
-        graphics_mask = _math_socket(
-            nodes,
-            links,
-            "MAXIMUM",
-            graphics_mask,
-            mark_mask,
-        )
-
-    final_color = nodes.new("ShaderNodeMixRGB")
-    final_color.blend_type = "MIX"
-    links.new(graphics_mask, final_color.inputs[0])
-    links.new(base_color.outputs[0], final_color.inputs[1])
-    final_color.inputs[2].default_value = line_color
-    links.new(final_color.outputs[0], principled.inputs["Base Color"])
-    links.new(final_color.outputs[0], principled.inputs["Emission Color"])
-    return material
 
 
 def _parent_at(obj, parent, location) -> None:
@@ -218,21 +68,45 @@ def _box(name: str, parent, location, dimensions, material):
     return obj
 
 
-def _circle(name: str, parent, location, radius: float, material):
+def _semicircle(name: str, parent, upper: bool, radius: float, material):
     vertices = [(0.0, 0.0, 0.0)]
     segments = 64
+    start = 0.0 if upper else math.pi
     vertices.extend(
         (
-            radius * math.cos(2.0 * math.pi * index / segments),
+            radius * math.cos(start + math.pi * index / segments),
             0.0,
-            radius * math.sin(2.0 * math.pi * index / segments),
+            radius * math.sin(start + math.pi * index / segments),
         )
-        for index in range(segments)
+        for index in range(segments + 1)
     )
-    faces = [
-        (0, 1 + ((index + 1) % segments), 1 + index)
-        for index in range(segments)
-    ]
+    faces = [(0, index + 2, index + 1) for index in range(segments)]
+    mesh = bpy.data.meshes.new(f"{name}_Mesh")
+    mesh.from_pydata(vertices, [], faces)
+    mesh.materials.append(material)
+    obj = bpy.data.objects.new(name, mesh)
+    bpy.context.scene.collection.objects.link(obj)
+    _parent_at(obj, parent, (0.0, 0.0, 0.0))
+    return obj
+
+
+def _aperture_mask(name: str, parent, location, inner_radius: float, outer_radius: float, material):
+    """Create an opaque annulus that clips moving PFD geometry physically."""
+    segments = 64
+    vertices = []
+    for index in range(segments):
+        angle = 2.0 * math.pi * index / segments
+        direction = (math.cos(angle), math.sin(angle))
+        vertices.extend(
+            (
+                (inner_radius * direction[0], 0.0, inner_radius * direction[1]),
+                (outer_radius * direction[0], 0.0, outer_radius * direction[1]),
+            )
+        )
+    faces = []
+    for index in range(segments):
+        next_index = (index + 1) % segments
+        faces.append((2 * index, 2 * next_index, 2 * next_index + 1, 2 * index + 1))
     mesh = bpy.data.meshes.new(f"{name}_Mesh")
     mesh.from_pydata(vertices, [], faces)
     mesh.materials.append(material)
@@ -400,30 +274,61 @@ def _build_pfd(panel, black, dark, white, sky, ground, cyan, amber, magenta):
         _box(f"Instrument_AirTickLine_{suffix}", panel, (0.151, 0.030, z), (0.012, 0.003, 0.002), white)
         _box(f"Instrument_AltTickLine_{suffix}", panel, (-0.151, 0.030, z), (0.012, 0.003, 0.002), white)
 
-    # One fixed circular disc draws the complete moving attitude presentation.
-    # Object color carries pitch/bank as a compact per-object GPU uniform.
-    attitude_material = _pfd_attitude_material(
-        "InstrumentPFDAttitude",
-        tuple(sky.diffuse_color),
-        tuple(ground.diffuse_color),
-        tuple(white.diffuse_color),
+    # Use ordinary meshes and a foreground annulus instead of a node shader.
+    # UPBGE/OpenXR renders this physical depth mask consistently in both eyes.
+    attitude = _empty("Instrument_PFD_Attitude", panel, (0.0, 0.013, 0.0))
+    attitude["panel_base_y"] = 0.013
+    attitude["pfd_render_path"] = "CIRCULAR_MASKED_GEOMETRY"
+    _semicircle(
+        "Instrument_PFD_Sky",
+        attitude,
+        True,
+        PFD_HORIZON_RADIUS_METERS,
+        sky,
     )
-    attitude = _circle(
-        "Instrument_PFD_Attitude",
-        panel,
-        (0.0, 0.018, 0.0),
-        PFD_RADIUS_METERS,
-        attitude_material,
+    _semicircle(
+        "Instrument_PFD_Ground",
+        attitude,
+        False,
+        PFD_HORIZON_RADIUS_METERS,
+        ground,
     )
-    attitude.color = (0.5, 1.0, 0.5, 1.0)
-    attitude["pfd_render_path"] = "FIXED_DISC_GPU_MATERIAL"
+    _box(
+        "Instrument_PFD_HorizonLine",
+        attitude,
+        (0.0, 0.001, 0.0),
+        (2.0 * PFD_HORIZON_RADIUS_METERS, 0.002, 0.004),
+        white,
+    )
+    ladder = _empty("Instrument_PFD_Ladder", attitude, (0.0, 0.001, 0.0))
+    for pitch in (-20, -10, -5, 5, 10, 20):
+        width = 0.080 if abs(pitch) % 10 == 0 else 0.045
+        _box(
+            f"Instrument_PitchMark_{pitch:+03d}",
+            ladder,
+            (0.0, 0.0, pitch * 0.004),
+            (width, 0.002, 0.003),
+            white,
+        )
 
-    _ring("Instrument_PFD_Bezel", panel, (0.0, 0.033, 0.0), 0.1345, white)
+    clip_mask = _aperture_mask(
+        "Instrument_PFD_ClipMask",
+        panel,
+        (0.0, 0.017, 0.0),
+        PFD_RADIUS_METERS,
+        PFD_MASK_OUTER_RADIUS_METERS,
+        black,
+    )
+    clip_mask["pfd_clip_path"] = "OPAQUE_ANNULUS"
+
+    # Mask and bezel share one depth plane so an oblique HMD view cannot
+    # introduce a one-eye/one-line-width parallax offset.
+    _ring("Instrument_PFD_Bezel", panel, (0.0, 0.017, 0.0), 0.1345, white)
 
     # Fixed aircraft symbol: it does not move with the horizon/ladder group.
-    _box("Instrument_AircraftLeft", panel, (-0.041, 0.038, -0.006), (0.058, 0.004, 0.005), magenta)
-    _box("Instrument_AircraftRight", panel, (0.041, 0.038, -0.006), (0.058, 0.004, 0.005), magenta)
-    _box("Instrument_AircraftCenter", panel, (0.0, 0.038, -0.012), (0.005, 0.004, 0.018), magenta)
+    _box("Instrument_AircraftLeft", panel, (-0.041, 0.021, -0.006), (0.058, 0.004, 0.005), magenta)
+    _box("Instrument_AircraftRight", panel, (0.041, 0.021, -0.006), (0.058, 0.004, 0.005), magenta)
+    _box("Instrument_AircraftCenter", panel, (0.0, 0.021, -0.012), (0.005, 0.004, 0.018), magenta)
 
 
 def _build_right(panel, white, cyan, amber):
@@ -482,7 +387,7 @@ def build_panel(scene=None):
     _build_pfd(panel, black, dark, white, sky, ground, cyan, amber, magenta)
     _build_right(panel, white, cyan, amber)
 
-    scene["instrument_panel_version"] = 2
+    scene["instrument_panel_version"] = 3
     scene["instrument_panel_mount"] = "BICYCLE_FIXED"
     return panel
 

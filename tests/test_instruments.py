@@ -1,8 +1,8 @@
+import math
 import unittest
 from types import SimpleNamespace
 
 from arrietty_up.instruments import (
-    attitude_shader_color,
     attitude_transform,
     build_readout,
     update_upbge_panel,
@@ -78,22 +78,19 @@ class InstrumentTests(unittest.TestCase):
         self.assertEqual(roll, -90.0)
 
     def test_pfd_pitch_translation_is_bounded(self):
-        self.assertEqual(attitude_transform(1000.0, 0.0), (0.0, -0.12, 0.0))
+        self.assertEqual(attitude_transform(1000.0, 0.0), (0.0, -0.048, 0.0))
 
-    def test_pfd_shader_encoding_is_bounded(self):
-        self.assertEqual(attitude_shader_color(1000.0, 0.0), (0.5, 1.0, 1.0, 1.0))
-        encoded = attitude_shader_color(10.0, 90.0)
-        self.assertAlmostEqual(encoded[0], 0.0)
-        self.assertAlmostEqual(encoded[1], 0.5)
-        self.assertAlmostEqual(encoded[2], 2.0 / 3.0)
-
-    def test_scene_update_sets_fixed_pfd_attitude_uniform(self):
+    def test_scene_update_moves_masked_pfd_geometry(self):
         class FakeObject(dict):
             localPosition = None
             localOrientation = None
-            color = None
 
-        attitude = FakeObject()
+        class FakeMatrix:
+            @staticmethod
+            def Rotation(angle, size, axis):
+                return (angle, size, axis)
+
+        attitude = FakeObject(panel_base_y=0.013)
         altitude = FakeObject(Text="0")
         scene = SimpleNamespace(
             objects={
@@ -105,11 +102,18 @@ class InstrumentTests(unittest.TestCase):
         state.flight.pitch_degrees = 10.0
         state.flight.bank_degrees = 90.0
         state.flight.altitude_meters = 0.4
-        update_upbge_panel(scene, state, 0.01)
+        from unittest.mock import patch
 
-        self.assertAlmostEqual(attitude.color[0], 0.0)
-        self.assertAlmostEqual(attitude.color[1], 0.5)
-        self.assertAlmostEqual(attitude.color[2], 2.0 / 3.0)
+        with patch.dict(
+            "sys.modules",
+            {"mathutils": SimpleNamespace(Matrix=FakeMatrix)},
+        ):
+            update_upbge_panel(scene, state, 0.01)
+
+        self.assertAlmostEqual(attitude.localPosition[0], 0.04)
+        self.assertAlmostEqual(attitude.localPosition[1], 0.013)
+        self.assertAlmostEqual(attitude.localPosition[2], 0.0, places=7)
+        self.assertAlmostEqual(attitude.localOrientation[0], -math.pi / 2.0)
         self.assertEqual(altitude["Text"], "0.4")
 
 

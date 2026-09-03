@@ -1,4 +1,4 @@
-"""Render close-up PFD checks without starting the game or any ride hardware."""
+"""Render close-up masked-PFD checks without game or ride hardware."""
 
 from __future__ import annotations
 
@@ -18,15 +18,17 @@ def _arguments():
     return parser.parse_args(arguments)
 
 
-def _attitude_color(pitch_degrees: float, bank_degrees: float):
-    pitch = max(-30.0, min(30.0, pitch_degrees))
+def _set_attitude(attitude, pitch_degrees: float, bank_degrees: float):
+    pitch = max(-12.0, min(12.0, pitch_degrees))
     rotation = math.radians(-bank_degrees)
-    return (
-        0.5 + 0.5 * math.sin(rotation),
-        0.5 + 0.5 * math.cos(rotation),
-        0.5 + pitch / 60.0,
-        1.0,
+    unbanked_z = -pitch * 0.004
+    attitude.location = (
+        math.sin(rotation) * unbanked_z,
+        attitude.get("panel_base_y", 0.013),
+        math.cos(rotation) * unbanked_z,
     )
+    attitude.rotation_mode = "XYZ"
+    attitude.rotation_euler = (0.0, rotation, 0.0)
 
 
 def _camera_facing_disc(attitude):
@@ -56,7 +58,7 @@ def main():
     scene = bpy.context.scene
     attitude = scene.objects.get("Instrument_PFD_Attitude")
     if attitude is None:
-        raise RuntimeError("ARRIETTY_PFD_RENDER_FAIL fixed PFD disc is absent")
+        raise RuntimeError("ARRIETTY_PFD_RENDER_FAIL attitude group is absent")
 
     scene.camera = _camera_facing_disc(attitude)
     # UPBGE keeps its Eevee engine identifier while upstream Blender calls the
@@ -72,15 +74,15 @@ def main():
     rendered = []
     for name, pitch, bank in (
         ("level", 0.0, 0.0),
-        ("pitch_up_20", 20.0, 0.0),
-        ("right_bank_30", 0.0, 30.0),
+        ("pitch_up_12", 12.0, 0.0),
+        ("right_bank_25", 0.0, 25.0),
     ):
-        attitude.color = _attitude_color(pitch, bank)
+        _set_attitude(attitude, pitch, bank)
         bpy.context.view_layer.update()
         output = output_dir / f"pfd-{name}.png"
         scene.render.filepath = str(output)
-        # Prime Eevee after changing the object-color uniform so the saved
-        # frame never contains temporal data from the preceding check case.
+        # Prime Eevee after moving the attitude group so the saved frame never
+        # contains temporal data from the preceding check case.
         bpy.ops.render.render(write_still=False)
         bpy.ops.render.render(write_still=True)
         rendered.append(str(output))

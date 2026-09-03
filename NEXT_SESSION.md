@@ -2,17 +2,16 @@
 
 Last updated: 2026-09-03 (Asia/Tokyo)
 
-The panel placement and human-powered flight controls were accepted in live
-OpenXR tests. The morning 2026-09-03 run achieved takeoff and controlled turns.
-The next-test build replaces per-frame `bpy` OpenXR access with a compiled C++
-bridge and replaces the moving PFD geometry with one fixed circular GPU disc.
+The panel, compiled C++ OpenXR bridge, PFD, and human-powered flight controls
+were accepted in live OpenXR tests on 2026-09-03. The next simulator task is
+the fan. After that, scenery work moves to `../Secret-World`.
 
-## Next live test
+## Next task
 
 Work from `C:\Users\azoo\git\Arrietty-UP`.
 
-The first VR instrument-panel prototype is now authored in the UPBGE scene and
-its placement was accepted in OpenXR. The first live adjustment moved it
+The VR instrument panel is authored in the UPBGE scene and its placement was
+accepted in OpenXR. The first live adjustment moved it
 from 1.0 m to 1.3 m forward and increased its upward tilt from 26.565 to 46.565
 degrees while retaining the 1.0 m center height. Its right-side debug block was
 expanded to show steering, flight commands, tuning, and voice status. Confirm
@@ -22,13 +21,11 @@ There are no numeric-keypad runtime controls. Start with
 `tools/launch_live_test.ps1` as shown below. With the HMD facing the physical
 bicycle direction and the handle centered, use Button 1 to align/start.
 
-For the next live test, first confirm the right-side debug block says
-`XR SYNCED`. Compare the PFD directly with the numeric PITCH/BANK/ALT values:
-pitch-up must move the horizon downward, bank must rotate the horizon opposite
-the aircraft bank, and no sky/earth or pitch mark may leave the circular disc.
-Also confirm that HMD translation/rotation remains smooth while pedalling and
-turning. The older geometry escaped the circular bezel; the fixed GPU disc is
-intended to eliminate that failure and now needs HMD verification.
+Finish and accept the fan behavior. The integrated fan has reacted to speed in
+an earlier run, but it is the remaining simulator item selected by the user for
+focused completion. Keep its I/O nonblocking and verify commanded/reported fan
+levels against ground and flight speed without adding `bpy` to the game-frame
+path.
 
 Terrain may also be prepared as a visual reference, but its authoring source
 should remain in Blender 5.2 LTS. Make a separate copy before opening or saving
@@ -41,9 +38,9 @@ scope here.
 
 ## Working baseline
 
-- Arrietty-UP version: `0.13.1-up.4`
+- Arrietty-UP version: `0.13.1-up.5`
 - Public repository: https://github.com/ysk424/Arrietty-UP
-- Accepted and pushed working baseline: `58c0031`
+- Accepted working baseline: current `main` HEAD
 - Standard Blender: locally built Blender 5.2.0 LTS
 - UPBGE build base: Blender 5.3.0 Alpha / UPBGE 0.53
 - Standard Blender MCP: `127.0.0.1:9876`
@@ -61,9 +58,21 @@ border while running is expected.
 
 ## Live hardware result
 
-The morning flight run on 2026-09-03 was accepted as a **working baseline with
-the previous moving-geometry PFD issue**. The next-test build addresses it but
-has not yet been accepted in the HMD.
+The afternoon flight run on 2026-09-03 was accepted as **PASS**.
+
+- OpenXR and the native C++ bridge reported `READY` / `XR SYNCED`.
+- CYCPLUS T2, Garmin heart rate, and the wired controller on `COM7` connected.
+- The run covered approximately 841.8 m, took off at 25.1 km/h, and landed at
+  21.4 km/h.
+- Button 4 stepped the right-aileron command from -1 through -10 degrees;
+  aircraft bank, PFD horizon, and the resulting turn matched the rider's intent.
+- The PFD physical aperture mask kept sky, earth, and pitch marks inside the
+  circle, and placing the mask and bezel on one depth plane corrected the HMD
+  center offset.
+- A GPU-node PFD attempted earlier in the same test rendered as a white circle
+  in OpenXR and is intentionally not the accepted implementation.
+
+The morning flight run on 2026-09-03 remains the earlier working baseline.
 
 - OpenXR appeared in the HMD and the game entered exactly once.
 - CYCPLUS T2 and the wired controller connected; the last controller port was
@@ -128,11 +137,11 @@ Run Blender-independent tests with:
 python3 -m unittest discover -s tests -v
 ```
 
-The current next-test build has 60 passing tests, including a source-boundary
+The accepted build has 60 passing tests, including a source-boundary
 test that rejects any `bpy` import under `arrietty_up`, panel formatting, PFD
 attitude transforms, button chord handling, VIVE steering math, voice protocol,
-HMD alignment math, and the connected flight runtime. Remaining integrations
-include live verification of the C++ OpenXR bridge and fixed-disc PFD, ride CSV,
-course-surface collision, resistance-preset selection, and VR alerts.
+HMD alignment math, pre-takeoff aileron feedback, and the connected flight
+runtime. The next focused integration is the fan. Scenery and flight-ring work
+belong in `../Secret-World`.
 
 Preserve unrelated user work in `../Arrietty` and `../Secret-World`.

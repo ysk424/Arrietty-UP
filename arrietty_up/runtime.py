@@ -213,6 +213,14 @@ class RuntimeState:
                 if action.roll_right_step > 0
                 else "BUTTON 3 ROLL LEFT"
             )
+        if action.pitch_step or action.roll_right_step:
+            print(
+                "ARRIETTY_FLIGHT_COMMAND "
+                f"pitch={self.digital_controls.pitch_degrees:+.1f} "
+                f"bank={self.digital_controls.bank_degrees:+.1f} "
+                f"source={self.last_control_message}",
+                flush=True,
+            )
 
     def flush_flight_button(self, now_seconds: float) -> None:
         action = self.flight_button_chord.flush(now_seconds)
@@ -466,6 +474,22 @@ class RuntimeState:
             self.last_flight_event = "LANDED"
         elif result.landing_blocked:
             self.last_flight_event = "LANDING REQUIRES COURSE"
+        if (
+            result.took_off
+            or result.stall_started
+            or result.stall_recovered
+            or result.landed
+            or result.landing_blocked
+        ):
+            print(
+                "ARRIETTY_FLIGHT_EVENT "
+                f"{self.last_flight_event} "
+                f"speed={self.flight.airspeed_meters_per_second * 3.6:.1f}km/h "
+                f"alt={self.flight.altitude_meters:.1f}m "
+                f"pitch={self.flight.pitch_degrees:+.1f} "
+                f"bank={self.flight.bank_degrees:+.1f}",
+                flush=True,
+            )
 
         delta = max(0.0, min(0.25, delta_seconds))
         turn_degrees = self.flight.heading_rate_degrees_per_second * delta

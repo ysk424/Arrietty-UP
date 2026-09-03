@@ -69,6 +69,16 @@ class HumanPoweredFlightTests(unittest.TestCase):
         self.assertGreater(controls.vertical_speed_meters_per_second, 0)
         self.assertGreater(controls.heading_rate_degrees_per_second, 0)
 
+    def test_flight_armed_aileron_command_is_visible_before_takeoff(self):
+        state = initialize_human_powered_flight(0)
+
+        result = step_human_powered_flight(state, 0, 0, 5, 0, 0.1, True)
+
+        self.assertFalse(result.took_off)
+        self.assertFalse(state.airborne)
+        self.assertGreater(state.bank_degrees, 0.0)
+        self.assertEqual(state.heading_rate_degrees_per_second, 0.0)
+
     def test_stall_recovery_and_glide(self):
         stall = initialize_human_powered_flight(17)
         stall.airborne = True

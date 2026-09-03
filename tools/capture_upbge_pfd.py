@@ -1,4 +1,4 @@
-"""Capture fixed-disc PFD states in UPBGE without starting ride hardware."""
+"""Capture physically masked PFD states in UPBGE without ride hardware."""
 
 from __future__ import annotations
 
@@ -23,22 +23,22 @@ def _arguments():
     return parser.parse_args(arguments)
 
 
-def _attitude_color(pitch_degrees: float, bank_degrees: float):
-    pitch = max(-30.0, min(30.0, pitch_degrees))
+def _attitude_transform(pitch_degrees: float, bank_degrees: float):
+    pitch = max(-12.0, min(12.0, pitch_degrees))
     rotation = math.radians(-bank_degrees)
+    unbanked_z = -pitch * 0.004
     return (
-        0.5 + 0.5 * math.sin(rotation),
-        0.5 + 0.5 * math.cos(rotation),
-        0.5 + pitch / 60.0,
-        1.0,
+        math.sin(rotation) * unbanked_z,
+        math.cos(rotation) * unbanked_z,
+        rotation,
     )
 
 
 def _bootstrap(output_dir: Path) -> str:
     cases = (
-        ("level", _attitude_color(0.0, 0.0)),
-        ("pitch_up_20", _attitude_color(20.0, 0.0)),
-        ("right_bank_30", _attitude_color(0.0, 30.0)),
+        ("level", _attitude_transform(0.0, 0.0)),
+        ("pitch_up_12", _attitude_transform(12.0, 0.0)),
+        ("right_bank_25", _attitude_transform(0.0, 25.0)),
     )
     return f'''
 import bge
@@ -53,13 +53,23 @@ _cases = {cases!r}
 _output_dir = {str(output_dir)!r}
 
 
+def set_attitude(attitude, transform):
+    shift_x, shift_z, rotation = transform
+    attitude.localPosition = (
+        shift_x,
+        attitude.get("panel_base_y", 0.013),
+        shift_z,
+    )
+    attitude.localOrientation = Matrix.Rotation(rotation, 3, "Y")
+
+
 def tick(controller):
     global _frame, _case_index, _finish_frame, _advance_frame, _capture_frame
     scene = bge.logic.getCurrentScene()
     try:
         attitude = scene.objects["Instrument_PFD_Attitude"]
     except (KeyError, SystemError):
-        print("ARRIETTY_UPBGE_PFD_FAIL fixed disc is absent", flush=True)
+        print("ARRIETTY_UPBGE_PFD_FAIL attitude group is absent", flush=True)
         bge.logic.endGame()
         return
 
@@ -71,7 +81,7 @@ def tick(controller):
         return
     if _advance_frame is not None and _frame >= _advance_frame:
         _case_index += 1
-        attitude.color = _cases[_case_index][1]
+        set_attitude(attitude, _cases[_case_index][1])
         _capture_frame = _frame + 14
         _advance_frame = None
     if _frame == 1:
@@ -89,14 +99,14 @@ def tick(controller):
             + str(tuple(round(v, 4) for v in camera.worldPosition)),
             flush=True,
         )
-        attitude.color = _cases[_case_index][1]
+        set_attitude(attitude, _cases[_case_index][1])
     elif _frame == _capture_frame:
-        name, color = _cases[_case_index]
+        name, transform = _cases[_case_index]
         path = _output_dir + "/upbge-pfd-" + name + ".png"
         bge.render.makeScreenshot(path)
         print(
             "ARRIETTY_UPBGE_PFD_CAPTURE "
-            + name + " color=" + str(tuple(round(v, 4) for v in attitude.color)),
+            + name + " transform=" + str(tuple(round(v, 4) for v in transform)),
             flush=True,
         )
         _case_index += 1

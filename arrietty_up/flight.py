@@ -175,7 +175,10 @@ def step_human_powered_flight(
     commanded_pitch = _clamp(target_pitch_degrees, -c.FLIGHT_MAX_PITCH_DEGREES, c.FLIGHT_MAX_PITCH_DEGREES)
     commanded_bank = _clamp(target_bank_degrees, -c.FLIGHT_MAX_BANK_DEGREES, c.FLIGHT_MAX_BANK_DEGREES)
     target_pitch = min(commanded_pitch, -10.0) if state.stalled else commanded_pitch
-    target_bank = commanded_bank if state.airborne else 0.0
+    # Keep the aileron/bank response visible while flight is armed on the
+    # runway. Previously the ground branch forced bank back to zero, which
+    # made both Button 3/4 and Joystick 2 appear broken until takeoff.
+    target_bank = commanded_bank
     pitch_authority = max(0.75, state.control_authority) if state.stalled else state.control_authority
     state.pitch_degrees = _interp_constant(
         state.pitch_degrees,
