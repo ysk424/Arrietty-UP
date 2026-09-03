@@ -54,6 +54,11 @@ banked turning. The accepted afternoon 2026-09-03 run covered approximately
 841.8 m, took off at 25.1 km/h, stepped the right-aileron bank command from
 -1 through -10 degrees, turned as expected, and landed at 21.4 km/h.
 
+The aircraft design target is a human-powered glider: two independently
+commanded ailerons, left and right elevator surfaces moving together, a rudder,
+and a pedal-driven pusher propeller behind the pilot. Flight-control behavior
+and future visible aircraft geometry should preserve this arrangement.
+
 OpenXR navigation now uses the compiled
 `syncOpenXRNavigation`, `getOpenXRViewerRotation`,
 `getOpenXRNavigationRotation`, and `resetOpenXRNavigation` APIs. The runtime

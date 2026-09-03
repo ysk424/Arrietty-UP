@@ -6,6 +6,11 @@ The panel, compiled C++ OpenXR bridge, PFD, and human-powered flight controls
 were accepted in live OpenXR tests on 2026-09-03. The next simulator task is
 the fan. After that, scenery work moves to `../Secret-World`.
 
+The agreed aircraft model is a human-powered glider with two ailerons, paired
+elevator surfaces that move together, a rudder, and a pedal-driven pusher
+propeller behind the pilot. Preserve that control and geometry model in future
+work.
+
 ## Next task
 
 Work from `C:\Users\azoo\git\Arrietty-UP`.
