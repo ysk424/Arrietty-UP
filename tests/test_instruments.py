@@ -46,6 +46,9 @@ class InstrumentTests(unittest.TestCase):
         self.assertEqual(panel.trainer_grade, "--.- %")
         self.assertEqual(panel.mode, "STANDBY")
         self.assertEqual(panel.elapsed_time, "0:00:00")
+        self.assertEqual(panel.heading, "000")
+        self.assertEqual(panel.heading_ticks, ("340", "350", "010", "020"))
+        self.assertEqual(panel.home_marker, "HOME")
 
     def test_elapsed_time_supports_long_rides_and_invalid_values(self):
         state = RuntimeState()
@@ -61,14 +64,22 @@ class InstrumentTests(unittest.TestCase):
         state.flight.airborne = True
         state.flight.airspeed_meters_per_second = 12.5
         state.flight.altitude_meters = 123.0
+        state.navigation_heading_degrees = 356.6
+        state.home_relative_degrees = 30.0
+        state.home_distance_meters = 1200.0
 
         panel = build_readout(state, 0.01)
 
         self.assertEqual(panel.mode, "FLIGHT")
         self.assertEqual(panel.airspeed, "45")
         self.assertEqual(panel.airspeed_ticks, ("20", "30", "50", "60"))
+        self.assertEqual(panel.stall_speed, "STALL 18")
         self.assertEqual(panel.altitude, "123")
         self.assertEqual(panel.altitude_ticks, ("0", "50", "150", "200"))
+        self.assertEqual(panel.heading, "357")
+        self.assertEqual(panel.heading_ticks, ("340", "350", "010", "020"))
+        self.assertEqual(panel.home_marker, "H>")
+        self.assertAlmostEqual(panel.home_marker_x, -0.122)
         self.assertEqual(panel.pfd_status, "PFD / AIRBORNE")
         self.assertEqual(panel.pfd_state, "P +0.0  B +0.0  ALT 123.0 m")
         self.assertIn("ALT    123.0 m", panel.physics)
@@ -105,16 +116,29 @@ class InstrumentTests(unittest.TestCase):
 
         attitude = FakeObject(panel_base_y=0.013)
         altitude = FakeObject(Text="0")
+        heading = FakeObject(Text="000")
+        stall_speed = FakeObject(Text="STALL 18")
+        home_marker = FakeObject(
+            Text="HOME",
+            panel_base_y=0.038,
+            panel_base_z=0.136,
+        )
         scene = SimpleNamespace(
             objects={
                 "Instrument_PFD_Attitude": attitude,
                 "Instrument_AltitudeValue": altitude,
+                "Instrument_HeadingValue": heading,
+                "Instrument_StallSpeedValue": stall_speed,
+                "Instrument_CompassHomeMarker": home_marker,
             }
         )
         state = RuntimeState()
         state.flight.pitch_degrees = 10.0
         state.flight.bank_degrees = 90.0
         state.flight.altitude_meters = 0.4
+        state.navigation_heading_degrees = 91.2
+        state.home_relative_degrees = -12.5
+        state.home_distance_meters = 200.0
         from unittest.mock import patch
 
         with patch.dict(
@@ -128,6 +152,11 @@ class InstrumentTests(unittest.TestCase):
         self.assertAlmostEqual(attitude.localPosition[2], 0.0, places=7)
         self.assertAlmostEqual(attitude.localOrientation[0], -math.pi / 2.0)
         self.assertEqual(altitude["Text"], "0.4")
+        self.assertEqual(heading["Text"], "091")
+        self.assertEqual(stall_speed["Text"], "STALL 18")
+        self.assertEqual(home_marker["Text"], "H")
+        self.assertAlmostEqual(home_marker.localPosition[0], 0.061)
+        self.assertEqual(home_marker.localPosition[1:], (0.038, 0.136))
 
 
 if __name__ == "__main__":

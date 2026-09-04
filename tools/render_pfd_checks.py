@@ -15,6 +15,7 @@ def _arguments():
     arguments = sys.argv[sys.argv.index("--") + 1 :] if "--" in sys.argv else []
     parser = argparse.ArgumentParser()
     parser.add_argument("--pfd-output-dir", type=Path, required=True)
+    parser.add_argument("--pfd-ortho-scale", type=float, default=0.31)
     return parser.parse_args(arguments)
 
 
@@ -31,7 +32,7 @@ def _set_attitude(attitude, pitch_degrees: float, bank_degrees: float):
     attitude.rotation_euler = (0.0, rotation, 0.0)
 
 
-def _camera_facing_disc(attitude):
+def _camera_facing_disc(attitude, ortho_scale: float):
     center = attitude.matrix_world.translation
     axes = attitude.matrix_world.to_3x3()
     normal = (axes @ Vector((0.0, 1.0, 0.0))).normalized()
@@ -42,7 +43,7 @@ def _camera_facing_disc(attitude):
 
     camera_data = bpy.data.cameras.new("ArriettyPFDCheckCameraData")
     camera_data.type = "ORTHO"
-    camera_data.ortho_scale = 0.31
+    camera_data.ortho_scale = ortho_scale
     camera = bpy.data.objects.new("ArriettyPFDCheckCamera", camera_data)
     bpy.context.scene.collection.objects.link(camera)
     camera.location = center + normal * 0.5
@@ -60,7 +61,7 @@ def main():
     if attitude is None:
         raise RuntimeError("ARRIETTY_PFD_RENDER_FAIL attitude group is absent")
 
-    scene.camera = _camera_facing_disc(attitude)
+    scene.camera = _camera_facing_disc(attitude, options.pfd_ortho_scale)
     # UPBGE keeps its Eevee engine identifier while upstream Blender calls the
     # equivalent engine BLENDER_EEVEE_NEXT.
     scene.render.engine = "BLENDER_EEVEE"

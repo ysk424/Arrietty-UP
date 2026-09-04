@@ -15,8 +15,8 @@ def _fail(message: str) -> None:
 scene = bpy.context.scene
 if not scene.game_settings.use_viewport_render:
     _fail("OpenXR requires UPBGE Viewport Render mode")
-if scene.get("instrument_panel_version") != 4:
-    _fail("instrument panel version is not 4")
+if scene.get("instrument_panel_version") != 5:
+    _fail("instrument panel version is not 5")
 required_objects = (
     "ArriettyRuntime",
     "ArriettyCamera",
@@ -24,6 +24,14 @@ required_objects = (
     "Funafuti Runway 03-21",
     "InstrumentPanelRoot",
     "Instrument_ElapsedValue",
+    "Instrument_CompassTape",
+    "Instrument_HeadingValue",
+    "Instrument_HeadingTick_M2",
+    "Instrument_HeadingTick_M1",
+    "Instrument_HeadingTick_P1",
+    "Instrument_HeadingTick_P2",
+    "Instrument_CompassHomeMarker",
+    "Instrument_StallSpeedValue",
     "Instrument_PFD_Attitude",
     "Instrument_PFD_Sky",
     "Instrument_PFD_Ground",
@@ -38,6 +46,12 @@ required_objects = (
 missing = [name for name in required_objects if scene.objects.get(name) is None]
 if missing:
     _fail(f"missing objects: {missing}")
+if scene.get("instrument_compass_runtime") != "UPBGE RUNTIME NO BPY":
+    _fail("instrument compass is not bound to the no-bpy runtime")
+
+home_marker = scene.objects["Instrument_CompassHomeMarker"]
+if home_marker.get("navigation_source") != "UPBGE RUNTIME NO BPY":
+    _fail("home marker is not bound to the no-bpy runtime")
 
 if scene.get("arrietty_initial_world") != "TUVALU_FUNAFUTI":
     _fail("Tuvalu/Funafuti is not the initial world")

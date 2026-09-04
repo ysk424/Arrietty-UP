@@ -11,6 +11,7 @@ from arrietty_up.runtime import (
     _reset_xr_navigation,
     _sync_xr_navigation,
     _try_align_hmd_to_bike,
+    _update_navigation,
 )
 
 
@@ -420,6 +421,21 @@ class RuntimeStateTests(unittest.TestCase):
         self.assertAlmostEqual(state.hmd_alignment_degrees, -90.0)
         self.assertTrue(_reset_xr_navigation(logic))
         self.assertEqual(logic.reset_count, 1)
+
+    def test_navigation_points_back_to_the_ride_start(self):
+        state = self.make_state()
+        state.start_position_x_meters = 10.0
+        state.start_position_y_meters = 20.0
+        state.position_x_meters = 10.0
+        state.position_y_meters = 10.0
+        state.heading_degrees = 90.0
+
+        _update_navigation(state)
+
+        self.assertEqual(state.navigation_heading_degrees, 90.0)
+        self.assertEqual(state.home_bearing_degrees, 0.0)
+        self.assertEqual(state.home_relative_degrees, -90.0)
+        self.assertEqual(state.home_distance_meters, 10.0)
 
     def test_hmd_alignment_waits_for_a_valid_rendered_pose(self):
         class DelayedOpenXRLogic(FakeOpenXRLogic):

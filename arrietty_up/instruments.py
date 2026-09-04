@@ -9,9 +9,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 import math
 
+from . import constants as c
+
 
 PITCH_METERS_PER_DEGREE = 0.004
 PFD_DISPLAY_PITCH_LIMIT_DEGREES = 12.0
+COMPASS_TICK_STEP_DEGREES = 10.0
+COMPASS_HOME_SPAN_DEGREES = 25.0
+COMPASS_HOME_HALF_WIDTH_METERS = 0.122
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,8 +29,13 @@ class InstrumentReadout:
     elapsed_time: str
     airspeed: str
     airspeed_ticks: tuple[str, str, str, str]
+    stall_speed: str
     altitude: str
     altitude_ticks: tuple[str, str, str, str]
+    heading: str
+    heading_ticks: tuple[str, str, str, str]
+    home_marker: str
+    home_marker_x: float
     pfd_status: str
     pfd_state: str
     physics: str
@@ -59,6 +69,66 @@ def _tape_ticks(value: float, step: float, *, decimals: int = 0) -> tuple[str, .
     return tuple("" if item < 0.0 else formatter.format(item) for item in values)
 
 
+def _normalize_heading_degrees(value: float) -> float:
+    try:
+        heading = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+    if not math.isfinite(heading):
+        return 0.0
+    return heading % 360.0
+
+
+def _format_heading(value: float) -> str:
+    return f"{int(math.floor(_normalize_heading_degrees(value) + 0.5)) % 360:03d}"
+
+
+def _heading_tape_ticks(value: float) -> tuple[str, str, str, str]:
+    center = math.floor(
+        _normalize_heading_degrees(value) / COMPASS_TICK_STEP_DEGREES + 0.5
+    ) * COMPASS_TICK_STEP_DEGREES
+    values = (
+        center - 2.0 * COMPASS_TICK_STEP_DEGREES,
+        center - COMPASS_TICK_STEP_DEGREES,
+        center + COMPASS_TICK_STEP_DEGREES,
+        center + 2.0 * COMPASS_TICK_STEP_DEGREES,
+    )
+    cardinal = {0: "N", 90: "E", 180: "S", 270: "W"}
+    return tuple(
+        cardinal.get(int(item) % 360, f"{int(item) % 360:03d}")
+        for item in values
+    )
+
+
+def _home_marker(relative_degrees: float, distance_meters: float) -> tuple[str, float]:
+    try:
+        relative = float(relative_degrees)
+        distance = float(distance_meters)
+    except (TypeError, ValueError):
+        return "H", 0.0
+    if not math.isfinite(relative) or not math.isfinite(distance):
+        return "H", 0.0
+    if distance <= 0.5:
+        return "HOME", 0.0
+
+    clamped = max(
+        -COMPASS_HOME_SPAN_DEGREES,
+        min(COMPASS_HOME_SPAN_DEGREES, relative),
+    )
+    # Panel-local X+ is rider-left. A positive relative bearing is to the
+    # rider's right, so its authored object moves in the negative X direction.
+    position_x = (
+        -clamped
+        / COMPASS_HOME_SPAN_DEGREES
+        * COMPASS_HOME_HALF_WIDTH_METERS
+    )
+    if relative < -COMPASS_HOME_SPAN_DEGREES:
+        return "<H", position_x
+    if relative > COMPASS_HOME_SPAN_DEGREES:
+        return "H>", position_x
+    return "H", position_x
+
+
 def _format_elapsed_time(elapsed_seconds: float) -> str:
     try:
         elapsed = float(elapsed_seconds)
@@ -77,6 +147,13 @@ def build_readout(runtime, delta_seconds: float) -> InstrumentReadout:
     flight = runtime.flight
     airspeed_kmh = max(0.0, flight.airspeed_meters_per_second * 3.6)
     altitude_meters = max(0.0, flight.altitude_meters)
+    heading_degrees = _normalize_heading_degrees(
+        getattr(runtime, "navigation_heading_degrees", runtime.heading_degrees)
+    )
+    home_marker, home_marker_x = _home_marker(
+        getattr(runtime, "home_relative_degrees", 0.0),
+        getattr(runtime, "home_distance_meters", 0.0),
+    )
     heart_rate = "---" if runtime.heart_rate_bpm is None else str(runtime.heart_rate_bpm)
     grade = (
         "--.- %"
@@ -104,7 +181,7 @@ def build_readout(runtime, delta_seconds: float) -> InstrumentReadout:
             f"BANK   {flight.bank_degrees:+5.1f} deg",
             f"AOA    {flight.angle_of_attack_degrees:+5.1f} deg",
             f"CAD    {runtime.cadence_rpm:5.1f} rpm",
-            f"HEAD   {runtime.heading_degrees:+5.1f} deg",
+            f"HEAD   {heading_degrees:05.1f} deg",
         )
     )
     debug = "\n".join(
@@ -137,12 +214,17 @@ def build_readout(runtime, delta_seconds: float) -> InstrumentReadout:
         ),
         airspeed=f"{airspeed_kmh:.0f}",
         airspeed_ticks=_tape_ticks(airspeed_kmh, 10.0),
+        stall_speed=f"STALL {c.FLIGHT_STALL_SPEED_KMH:.0f}",
         altitude=(
             f"{altitude_meters:.1f}"
             if altitude_meters < 100.0
             else f"{altitude_meters:.0f}"
         ),
         altitude_ticks=_tape_ticks(altitude_meters, 50.0),
+        heading=_format_heading(heading_degrees),
+        heading_ticks=_heading_tape_ticks(heading_degrees),
+        home_marker=home_marker,
+        home_marker_x=home_marker_x,
         pfd_status=_pfd_status(runtime),
         pfd_state=pfd_state,
         physics=physics,
@@ -198,7 +280,10 @@ def update_upbge_panel(scene, runtime, delta_seconds: float) -> None:
         "Instrument_ModeValue": readout.mode,
         "Instrument_ElapsedValue": readout.elapsed_time,
         "Instrument_AirspeedValue": readout.airspeed,
+        "Instrument_StallSpeedValue": readout.stall_speed,
         "Instrument_AltitudeValue": readout.altitude,
+        "Instrument_HeadingValue": readout.heading,
+        "Instrument_CompassHomeMarker": readout.home_marker,
         "Instrument_PFDHeading": readout.pfd_status,
         "Instrument_PFDState": readout.pfd_state,
         "Instrument_PhysicsText": readout.physics,
@@ -211,6 +296,16 @@ def update_upbge_panel(scene, runtime, delta_seconds: float) -> None:
         _set_text(scene, f"Instrument_AirspeedTick_{suffix}", value)
     for suffix, value in zip(("M2", "M1", "P1", "P2"), readout.altitude_ticks):
         _set_text(scene, f"Instrument_AltitudeTick_{suffix}", value)
+    for suffix, value in zip(("M2", "M1", "P1", "P2"), readout.heading_ticks):
+        _set_text(scene, f"Instrument_HeadingTick_{suffix}", value)
+
+    home_marker = _scene_object(scene, "Instrument_CompassHomeMarker")
+    if home_marker is not None:
+        home_marker.localPosition = (
+            readout.home_marker_x,
+            home_marker.get("panel_base_y", 0.038),
+            home_marker.get("panel_base_z", 0.136),
+        )
 
     attitude = _scene_object(scene, "Instrument_PFD_Attitude")
     if attitude is not None:

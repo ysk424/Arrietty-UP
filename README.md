@@ -175,9 +175,18 @@ reference), centered 1.3 m forward at a height of 1.0 m and tilted upward
 heart rate and T2 power prominently, plus bicycle ground speed, applied T2
 grade, mode, and elapsed time from Button 1 start. The elapsed clock begins at
 `0:00:00` and continues through ground and flight modes. The center is a PFD
-with vertical airspeed and altitude tapes;
-its artificial horizon and pitch ladder move as ordinary UPBGE meshes behind a
-fixed opaque circular annulus. The annulus and outer bezel are coplanar, so the
+with vertical airspeed and altitude tapes and a horizontal geographic heading
+tape. The compass uses Secret World's East-North-Up axes, so its cardinal
+values are true local bearings (`N=000`, `E=090`, `S=180`, `W=270`). A magenta
+`H` marker moves toward the bearing back to the position where the game session
+began; when that bearing is outside the visible tape it remains at the
+applicable edge as `<H` or `H>`. The airspeed tape also displays the modeled
+`STALL 18` km/h speed in red. These live values use the existing UPBGE `bge`
+game API and never import `bpy` during a game frame; `bpy` is used only by the
+offline panel-building tool.
+
+The PFD's artificial horizon and pitch ladder move as ordinary UPBGE meshes
+behind a fixed opaque circular annulus. The annulus and outer bezel are coplanar, so the
 earth/sky presentation stays inside and centered in the aperture from an HMD
 view. This physical mask replaced a GPU-node version that rendered correctly
 on the desktop but appeared as a white circle in OpenXR. The right section
@@ -204,5 +213,5 @@ python3 -m unittest discover -s tests -v
 For a live test, start SteamVR first and then run:
 
 ```powershell
-.\start.ps1
+& ..\Secret-World\start_arrietty_up.ps1
 ```

@@ -60,7 +60,10 @@ class SerialControllerTests(unittest.TestCase):
         self.assertEqual(buffer, b"")
 
     def test_candidate_ports(self):
-        with patch.dict(os.environ, {}, clear=True):
+        with patch.dict(os.environ, {}, clear=True), patch(
+            "arrietty_up.serial_controller._windows_present_port_names",
+            return_value=(),
+        ):
             ports = candidate_port_names()
             self.assertEqual((ports[0], ports[-1]), ("COM64", "COM1"))
         with patch.dict(os.environ, {"ARRIETTY_CONTROLLER_PORT": "com7"}):

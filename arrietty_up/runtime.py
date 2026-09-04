@@ -72,7 +72,13 @@ class RuntimeState:
     brake_button_held: bool = False
     position_x_meters: float = 0.0
     position_y_meters: float = 0.0
+    start_position_x_meters: float = 0.0
+    start_position_y_meters: float = 0.0
     heading_degrees: float = 0.0
+    navigation_heading_degrees: float = 0.0
+    home_bearing_degrees: float = 0.0
+    home_relative_degrees: float = 0.0
+    home_distance_meters: float = 0.0
     steering_tracking: bool = False
     steering_status: str = "IDLE"
     steering_message: str = "VIVE steering is stopped"
@@ -637,6 +643,27 @@ def _initial_heading_degrees(game_object) -> float:
     return _unwind_degrees(heading) if math.isfinite(heading) else 0.0
 
 
+def _update_navigation(runtime: RuntimeState) -> None:
+    """Update the no-bpy heading tape and bearing back to the ride start."""
+    # Secret World uses a local East-North-Up plane (X east, Y north), while
+    # the accepted OpenXR vehicle forward axis is local/world Y-. Convert the
+    # simulation yaw to the conventional clockwise bearing from true north.
+    runtime.navigation_heading_degrees = (
+        180.0 - runtime.heading_degrees
+    ) % 360.0
+    home_dx = runtime.start_position_x_meters - runtime.position_x_meters
+    home_dy = runtime.start_position_y_meters - runtime.position_y_meters
+    runtime.home_distance_meters = math.hypot(home_dx, home_dy)
+    runtime.home_bearing_degrees = (
+        runtime.navigation_heading_degrees
+        if runtime.home_distance_meters < 1.0e-6
+        else math.degrees(math.atan2(home_dx, home_dy)) % 360.0
+    )
+    runtime.home_relative_degrees = _unwind_degrees(
+        runtime.home_bearing_degrees - runtime.navigation_heading_degrees
+    )
+
+
 def _sync_xr_navigation(runtime: RuntimeState, game_object, logic) -> bool:
     """Ask UPBGE's C++ bridge to copy the game-object pose into OpenXR."""
     previous_status = runtime.xr_bridge_status
@@ -767,6 +794,18 @@ def tick(controller) -> None:
 
     if runtime.frame_count == 1:
         runtime.heading_degrees = _initial_heading_degrees(owner)
+        runtime.navigation_heading_degrees = (
+            180.0 - runtime.heading_degrees
+        ) % 360.0
+        try:
+            initial_position = owner.worldPosition
+            runtime.position_x_meters = float(initial_position[0])
+            runtime.position_y_meters = float(initial_position[1])
+        except (AttributeError, TypeError, ValueError):
+            runtime.position_x_meters = 0.0
+            runtime.position_y_meters = 0.0
+        runtime.start_position_x_meters = runtime.position_x_meters
+        runtime.start_position_y_meters = runtime.position_y_meters
         owner["arrietty_status"] = "RUNNING"
         owner["arrietty_version"] = c.VERSION
         owner["controller_status"] = "STARTING"
@@ -961,8 +1000,13 @@ def tick(controller) -> None:
         runtime.flight.altitude_meters,
     )
     owner.worldOrientation = _vehicle_orientation(runtime)
+    _update_navigation(runtime)
     _sync_xr_navigation(runtime, owner, bge.logic)
     owner["xr_bridge_status"] = runtime.xr_bridge_status
+    owner["navigation_heading_degrees"] = runtime.navigation_heading_degrees
+    owner["home_bearing_degrees"] = runtime.home_bearing_degrees
+    owner["home_relative_degrees"] = runtime.home_relative_degrees
+    owner["home_distance_meters"] = runtime.home_distance_meters
     fan_before = (
         runtime.fan.status,
         runtime.fan.requested_level,

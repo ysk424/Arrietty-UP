@@ -249,8 +249,16 @@ def _build_left(panel, white, cyan, red, amber):
     _text("Instrument_ElapsedValue", panel, "0:00:00", (0.420, 0.022, -0.178), 0.016, amber)
 
 
-def _build_pfd(panel, black, dark, white, sky, ground, cyan, amber, magenta):
-    _text("Instrument_PFDHeading", panel, "PRIMARY FLIGHT DISPLAY", (0.0, 0.030, 0.166), 0.015, cyan, align="CENTER")
+def _build_pfd(panel, black, dark, white, sky, ground, cyan, amber, magenta, red):
+    _text(
+        "Instrument_PFDHeading",
+        panel,
+        "PRIMARY FLIGHT DISPLAY",
+        (0.0, 0.030, 0.112),
+        0.010,
+        cyan,
+        align="CENTER",
+    )
     _text(
         "Instrument_PFDState",
         panel,
@@ -261,6 +269,83 @@ def _build_pfd(panel, black, dark, white, sky, ground, cyan, amber, magenta):
         align="CENTER",
     )
 
+    # Horizontal heading tape. The game-frame path updates these authored
+    # objects through UPBGE's bge API and never imports bpy.
+    _box(
+        "Instrument_CompassTape",
+        panel,
+        (0.0, 0.019, 0.163),
+        (0.300, 0.008, 0.064),
+        dark,
+    )
+    _text(
+        "Instrument_CompassLabel",
+        panel,
+        "HDG",
+        (0.124, 0.030, 0.185),
+        0.009,
+        white,
+        align="CENTER",
+    )
+    heading_tick_specs = (
+        ("M2", 0.118),
+        ("M1", 0.068),
+        ("P1", -0.068),
+        ("P2", -0.118),
+    )
+    for suffix, x in heading_tick_specs:
+        _text(
+            f"Instrument_HeadingTick_{suffix}",
+            panel,
+            "000",
+            (x, 0.030, 0.163),
+            0.011,
+            white,
+            align="CENTER",
+        )
+        _box(
+            f"Instrument_HeadingTickLine_{suffix}",
+            panel,
+            (x, 0.030, 0.143),
+            (0.002, 0.003, 0.009),
+            white,
+        )
+    _box(
+        "Instrument_HeadingWindow",
+        panel,
+        (0.0, 0.031, 0.163),
+        (0.050, 0.005, 0.034),
+        black,
+    )
+    _text(
+        "Instrument_HeadingValue",
+        panel,
+        "000",
+        (0.0, 0.037, 0.163),
+        0.020,
+        amber,
+        align="CENTER",
+    )
+    _box(
+        "Instrument_CompassIndex",
+        panel,
+        (0.0, 0.037, 0.140),
+        (0.003, 0.003, 0.011),
+        amber,
+    )
+    home_marker = _text(
+        "Instrument_CompassHomeMarker",
+        panel,
+        "HOME",
+        (0.0, 0.038, 0.136),
+        0.010,
+        magenta,
+        align="CENTER",
+    )
+    home_marker["panel_base_y"] = 0.038
+    home_marker["panel_base_z"] = 0.136
+    home_marker["navigation_source"] = "UPBGE RUNTIME NO BPY"
+
     # Vertical airspeed and altitude tapes.
     for name, x, label in (("Airspeed", 0.195, "AIR km/h"), ("Altitude", -0.195, "ALT m")):
         _box(f"Instrument_{name}Tape", panel, (x, 0.019, -0.006), (0.088, 0.008, 0.306), dark)
@@ -268,6 +353,15 @@ def _build_pfd(panel, black, dark, white, sky, ground, cyan, amber, magenta):
         _box(f"Instrument_{name}Window", panel, (x, 0.030, -0.006), (0.085, 0.005, 0.043), black)
 
     _text("Instrument_AirspeedValue", panel, "0", (0.195, 0.036, -0.006), 0.026, amber, align="CENTER")
+    _text(
+        "Instrument_StallSpeedValue",
+        panel,
+        "STALL 18",
+        (0.195, 0.030, -0.177),
+        0.009,
+        red,
+        align="CENTER",
+    )
     _text("Instrument_AltitudeValue", panel, "0", (-0.195, 0.036, -0.006), 0.026, amber, align="CENTER")
     tick_specs = (("M2", -0.112), ("M1", -0.061), ("P1", 0.049), ("P2", 0.100))
     for suffix, z in tick_specs:
@@ -386,11 +480,12 @@ def build_panel(scene=None):
     _section_frame(panel, 0.000, 0.500, 0.400, (black, frame))
     _section_frame(panel, 0.405, 0.270, 0.400, (black, frame))
     _build_left(panel, white, cyan, red, amber)
-    _build_pfd(panel, black, dark, white, sky, ground, cyan, amber, magenta)
+    _build_pfd(panel, black, dark, white, sky, ground, cyan, amber, magenta, red)
     _build_right(panel, white, cyan, amber)
 
-    scene["instrument_panel_version"] = 4
+    scene["instrument_panel_version"] = 5
     scene["instrument_panel_mount"] = "BICYCLE_FIXED"
+    scene["instrument_compass_runtime"] = "UPBGE RUNTIME NO BPY"
     return panel
 
 

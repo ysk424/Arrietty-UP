@@ -1,6 +1,6 @@
 # Next session handoff
 
-Last updated: 2026-09-04 (Asia/Tokyo)
+Last updated: 2026-09-05 (Asia/Tokyo)
 
 The panel, compiled C++ OpenXR bridge, PFD, human-powered flight controls, and
 physical fan were accepted in live tests on 2026-09-03. The Arrietty-UP
@@ -10,6 +10,19 @@ Z=0 in the center of the Funafuti runway, facing along runway 03-21.
 The final completion run launched from `start.ps1`, took off, landed, and
 confirmed that the Button 1 elapsed clock starts at `0:00:00`; the user marked
 the completed simulator **PASS**.
+
+On 2026-09-05 the PFD gained a horizontal geographic heading tape, a magenta
+home marker pointing back to the current game session's start position, and a
+red `STALL 18` km/h display. The compass converts the internal Y-minus vehicle
+heading to Secret World's East-North-Up geographic bearing. Dynamic updates use
+the existing UPBGE `bge` runtime path; there is no game-frame `bpy` import and
+no UPBGE rebuild is required. The expanded panel passed unit, source-boundary,
+blend-structure, and offline render checks. Secret World's Runtime build
+`20260904095413055` was prepared successfully with Arrietty source hash prefix
+`24218aedf38a`. The 2026-09-05 OpenXR/HMD flight launched through
+`../Secret-World/start_arrietty_up.ps1`; the user confirmed that the heading was
+readable in flight and accepted the result as **PASS**. The runtime then stopped
+cleanly.
 
 The agreed aircraft model is a human-powered glider with two ailerons, paired
 elevator surfaces that move together, a rudder, and a pedal-driven pusher
@@ -21,6 +34,8 @@ work.
 Continue world and scenery work from `C:\Users\azoo\git\Secret-World`.
 The Arrietty-UP details below are retained as the accepted simulator reference.
 Launch that reference from `C:\Users\azoo\git\Arrietty-UP` with `./start.ps1`.
+For the current integrated HMD test, use
+`C:\Users\azoo\git\Secret-World\start_arrietty_up.ps1` instead.
 
 The VR instrument panel is authored in the UPBGE scene and its placement was
 accepted in OpenXR. The first live adjustment moved it
@@ -51,7 +66,7 @@ scope here.
 
 ## Working baseline
 
-- Arrietty-UP version: `0.13.1-up.9`
+- Arrietty-UP version: `0.13.1-up.10`
 - Public repository: https://github.com/ysk424/Arrietty-UP
 - Accepted working baseline: current `main` HEAD
 - Standard Blender: locally built Blender 5.2.0 LTS
@@ -89,8 +104,8 @@ roles. The accepted source remains untouched; generated integration blends are
 validated outside this repository. Build `20260904095413055` produced 59
 one-kilometre scenery chunks, 61 no-collision/no-shadow visual meshes, and six
 lightweight runtime materials. The Secret World converter now applies the
-island `SOLIDIFY` and rejects every remaining world modifier. OpenXR flight
-performance still requires a live HMD acceptance run.
+island `SOLIDIFY` and rejects every remaining world modifier. The 2026-09-05
+live HMD flight accepted the integrated heading display in this prepared world.
 
 ## Live hardware result
 
@@ -187,7 +202,7 @@ Run Blender-independent tests with:
 python3 -m unittest discover -s tests -v
 ```
 
-The current build has 69 passing tests, including a source-boundary
+The current build has 75 passing tests, including a source-boundary
 test that rejects any `bpy` import under `arrietty_up`, panel formatting, PFD
 attitude transforms, button chord handling, VIVE steering math, voice protocol,
 HMD alignment math, pre-takeoff aileron feedback, and the connected flight
