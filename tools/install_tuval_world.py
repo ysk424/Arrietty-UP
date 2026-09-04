@@ -17,6 +17,7 @@ import bpy
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+BOOTSTRAP_SOURCE = PROJECT_ROOT / "arrietty_bootstrap.py"
 DEFAULT_SOURCE = PROJECT_ROOT / "Tuval-1.blend"
 DEFAULT_OUTPUT = PROJECT_ROOT / "Arrietty-UP.blend"
 SOURCE_COLLECTION = "Secret World"
@@ -109,6 +110,17 @@ def _runway_pose(runway) -> tuple[float, float]:
     return runway_elevation, initial_heading
 
 
+def _refresh_runtime_bootstrap() -> None:
+    """Embed the current project-root-aware bootstrap in the prepared game."""
+    if not BOOTSTRAP_SOURCE.is_file():
+        raise RuntimeError(f"Arrietty bootstrap is absent: {BOOTSTRAP_SOURCE}")
+    bootstrap = bpy.data.texts.get("arrietty_bootstrap.py")
+    if bootstrap is None:
+        bootstrap = bpy.data.texts.new("arrietty_bootstrap.py")
+    bootstrap.clear()
+    bootstrap.write(BOOTSTRAP_SOURCE.read_text(encoding="utf-8"))
+
+
 def install(source: Path, output: Path) -> dict:
     source = source.resolve()
     output = output.resolve()
@@ -138,6 +150,10 @@ def install(source: Path, output: Path) -> dict:
         raise RuntimeError("Tuvalu collection/world could not be appended")
     world_collection.name = INSTALLED_COLLECTION
     scene.collection.children.link(world_collection)
+    # Appended objects can retain a stale identity matrix until the dependency
+    # graph is evaluated. This matters when the editable test world already
+    # carries the -1.46 m runway-at-zero offset in its object transforms.
+    bpy.context.view_layer.update()
 
     imported_objects = _world_objects(world_collection)
     runway = next(
@@ -147,6 +163,9 @@ def install(source: Path, output: Path) -> dict:
     if runway is None:
         raise RuntimeError("Funafuti runway is absent from the appended world")
     runway_elevation, initial_heading = _runway_pose(runway)
+    source_content_z_offset = float(
+        runway.get("secret_world_test_content_z_offset_m", -runway_elevation)
+    )
 
     for collection in _collection_tree(world_collection):
         collection[INSTALL_PROPERTY] = True
@@ -169,6 +188,7 @@ def install(source: Path, output: Path) -> dict:
     marker[INSTALL_PROPERTY] = True
     marker["source_blend"] = source.name
     marker["runway_elevation_offset_m"] = -runway_elevation
+    marker["source_content_z_offset_m"] = source_content_z_offset
     marker["initial_heading_degrees"] = initial_heading
     scene.collection.objects.link(marker)
 
@@ -182,6 +202,8 @@ def install(source: Path, output: Path) -> dict:
     scene["secret_world_origin_latitude_exact"] = -8.5239843
     scene["secret_world_origin_longitude_exact"] = 179.1967829
     scene["secret_world_origin_ellipsoid_height_exact_m"] = 34.8356
+    scene["secret_world_test_content_z_offset_m"] = source_content_z_offset
+    scene["secret_world_sea_level_z"] = source_content_z_offset
 
     runtime["initial_heading_degrees"] = initial_heading
     runtime.rotation_euler.z = math.radians(initial_heading)
@@ -194,6 +216,7 @@ def install(source: Path, output: Path) -> dict:
             area.spaces.active.camera = camera
             area.spaces.active.region_3d.view_perspective = "CAMERA"
 
+    _refresh_runtime_bootstrap()
     bpy.ops.wm.save_as_mainfile(filepath=str(output), check_existing=False)
     return {
         "saved": str(output),
@@ -204,6 +227,7 @@ def install(source: Path, output: Path) -> dict:
             bool(obj.get("SecretWorldRideSurface")) for obj in imported_objects
         ),
         "runway_elevation_offset_m": round(-runway_elevation, 6),
+        "source_content_z_offset_m": round(source_content_z_offset, 6),
         "initial_heading_degrees": round(initial_heading, 6),
         "camera_clip_end_m": camera.data.clip_end,
     }

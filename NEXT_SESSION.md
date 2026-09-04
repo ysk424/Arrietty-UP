@@ -1,6 +1,6 @@
 # Next session handoff
 
-Last updated: 2026-09-03 (Asia/Tokyo)
+Last updated: 2026-09-04 (Asia/Tokyo)
 
 The panel, compiled C++ OpenXR bridge, PFD, human-powered flight controls, and
 physical fan were accepted in live tests on 2026-09-03. The Arrietty-UP
@@ -70,6 +70,13 @@ no `P` press is required. `Esc` leaves the game. The startup timer deliberately
 remains registered during the nested game loop, preventing the prior
 `BLI_timer_execute` access violation after returning to Blender. A darker
 rectangular game border while running is expected.
+
+Generated Secret World integration blends may live outside this repository.
+`tools/launch_live_test.ps1` now passes `ARRIETTY_PROJECT_ROOT` only to the
+launched process, and the embedded bootstrap prefers that explicit root when
+loading `arrietty_up` and `.runtime` dependencies. The Tuvalu installer refreshes
+the embedded bootstrap whenever it prepares a game blend. This prevents an
+external blend directory from being mistaken for the Arrietty-UP project root.
 
 ## Live hardware result
 
@@ -142,6 +149,8 @@ handling in `source/gameengine/Ketsji/KX_Scene.cpp`.
 - Native game-side OpenXR bridge commit: `7b63ea539c`
 - Private compact recovery snapshot: https://github.com/ysk424/upbge
 - Public upstream report: https://github.com/UPBGE/upbge/issues/2044
+- Upstream fix: `2d1b28a92646a6bd1eab38e331285690526b1797`; issue closed as
+  completed on 2026-09-04. No further action is planned.
 
 The full upstream history was intentionally not copied to the private
 repository. The private snapshot contains the complete modified source file,

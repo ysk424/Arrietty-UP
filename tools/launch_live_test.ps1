@@ -1,6 +1,7 @@
 param(
     [string]$BlenderPath = "C:\Users\azoo\git\build_upbge_windows_Release_x64_vc17_Release\bin\blender.exe",
-    [string]$BlendPath = "C:\Users\azoo\git\Arrietty-UP\Arrietty-UP.blend"
+    [string]$BlendPath = "C:\Users\azoo\git\Arrietty-UP\Arrietty-UP.blend",
+    [switch]$WaitForGoogleTiles
 )
 
 $ErrorActionPreference = "Stop"
@@ -25,16 +26,37 @@ if (-not (Test-Path -LiteralPath $BlendPath)) {
 $Stamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $Stdout = Join-Path $env:TEMP "arrietty-live-$Stamp.out.log"
 $Stderr = Join-Path $env:TEMP "arrietty-live-$Stamp.err.log"
-$Process = Start-Process `
-    -FilePath $BlenderPath `
-    -ArgumentList @("--online-mode", "--start-console", $BlendPath, "--python", $StartupScript) `
-    -RedirectStandardOutput $Stdout `
-    -RedirectStandardError $Stderr `
-    -PassThru
+$PreviousWaitForTiles = $env:ARRIETTY_WAIT_FOR_GOOGLE_TILES
+$PreviousProjectRoot = $env:ARRIETTY_PROJECT_ROOT
+try {
+    $env:ARRIETTY_WAIT_FOR_GOOGLE_TILES = if ($WaitForGoogleTiles) { "1" } else { "0" }
+    $env:ARRIETTY_PROJECT_ROOT = $ProjectRoot
+    $Process = Start-Process `
+        -FilePath $BlenderPath `
+        -ArgumentList @("--online-mode", "--start-console", $BlendPath, "--python", $StartupScript) `
+        -RedirectStandardOutput $Stdout `
+        -RedirectStandardError $Stderr `
+        -PassThru
+}
+finally {
+    if ($null -eq $PreviousWaitForTiles) {
+        Remove-Item Env:\ARRIETTY_WAIT_FOR_GOOGLE_TILES -ErrorAction SilentlyContinue
+    }
+    else {
+        $env:ARRIETTY_WAIT_FOR_GOOGLE_TILES = $PreviousWaitForTiles
+    }
+    if ($null -eq $PreviousProjectRoot) {
+        Remove-Item Env:\ARRIETTY_PROJECT_ROOT -ErrorAction SilentlyContinue
+    }
+    else {
+        $env:ARRIETTY_PROJECT_ROOT = $PreviousProjectRoot
+    }
+}
 
 [pscustomobject]@{
     ProcessId = $Process.Id
     Project = $ProjectRoot
     StandardOutput = $Stdout
     StandardError = $Stderr
+    WaitForGoogleTiles = [bool]$WaitForGoogleTiles
 } | Format-List

@@ -7,12 +7,26 @@ operator and supplies an explicit View3D context for the game transition.
 
 from __future__ import annotations
 
+import os
+
 import bpy
 
 
 _attempt = 0
 _xr_start_requested = False
+_xr_ready_announced = False
 _game_start_requested = False
+_wait_for_google_tiles = os.environ.get(
+    "ARRIETTY_WAIT_FOR_GOOGLE_TILES", "0"
+).strip() == "1"
+_google_wait_announced = False
+
+
+def _google_tiles_ready():
+    return any(
+        bool(obj.get("secret_world_google_live", False))
+        for obj in bpy.data.objects
+    )
 
 
 def _view3d_context():
@@ -32,7 +46,8 @@ def _view3d_context():
 
 
 def _start_openxr_then_game():
-    global _attempt, _xr_start_requested, _game_start_requested
+    global _attempt, _xr_start_requested, _xr_ready_announced
+    global _game_start_requested, _google_wait_announced
     # Entering the game engine pumps Blender events, so this timer can be
     # invoked again before game_start() returns. Mark the transition first.
     # A re-entrant call must keep the timer alive: unregistering it there frees
@@ -68,7 +83,20 @@ def _start_openxr_then_game():
             return None
         return 0.5
 
-    print("ARRIETTY_OPENXR_READY", flush=True)
+    if not _xr_ready_announced:
+        print("ARRIETTY_OPENXR_READY", flush=True)
+        _xr_ready_announced = True
+    if _wait_for_google_tiles and not _google_tiles_ready():
+        if not _google_wait_announced:
+            print(
+                "ARRIETTY_WAITING_FOR_GOOGLE_TILES "
+                "Use N > Secret World > Paste Google Tiles",
+                flush=True,
+            )
+            _google_wait_announced = True
+        return 0.5
+    if _wait_for_google_tiles:
+        print("ARRIETTY_GOOGLE_TILES_READY", flush=True)
     _game_start_requested = True
     with bpy.context.temp_override(
         window=window,

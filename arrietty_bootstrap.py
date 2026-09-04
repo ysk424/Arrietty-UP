@@ -1,12 +1,22 @@
 """UPBGE text-block entry point for the external Arrietty-UP package."""
 
+import os
 import sys
 from pathlib import Path
 
 import bge
 
 
-project_directory = str(Path(bge.logic.expandPath("//")).resolve())
+configured_project_directory = os.environ.get("ARRIETTY_PROJECT_ROOT", "").strip()
+project_path = (
+    Path(configured_project_directory).expanduser().resolve()
+    if configured_project_directory
+    else Path(bge.logic.expandPath("//")).resolve()
+)
+if not (project_path / "arrietty_up").is_dir():
+    raise RuntimeError(f"Arrietty-UP package is absent from {project_path}")
+project_directory = str(project_path)
+print(f"ARRIETTY_PROJECT_ROOT {project_directory}", flush=True)
 runtime_directory = Path(project_directory) / ".runtime"
 current_dependencies = runtime_directory / "current.txt"
 if current_dependencies.is_file():

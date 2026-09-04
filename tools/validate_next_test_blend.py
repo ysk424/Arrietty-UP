@@ -59,6 +59,15 @@ runway_z = sum((runway.matrix_world @ vertex.co).z for vertex in runway.data.ver
 runway_z /= len(runway.data.vertices)
 if abs(runway_z) > 1.0e-4:
     _fail("Funafuti runway surface is not aligned to Z=0")
+ocean = scene.objects.get("Funafuti Deep Ocean")
+if ocean is None:
+    _fail("Funafuti deep ocean is absent")
+ocean_z = sum((ocean.matrix_world @ vertex.co).z for vertex in ocean.data.vertices)
+ocean_z /= len(ocean.data.vertices)
+if abs(ocean_z + 1.46) > 1.0e-4:
+    _fail("Funafuti sea level is not aligned to Z=-1.46")
+if abs(float(scene.get("secret_world_test_content_z_offset_m", 0.0)) + 1.46) > 1.0e-4:
+    _fail("Tuvalu test-world content offset is not -1.46 m")
 ride_surfaces = [
     obj for obj in scene.objects if obj.get("SecretWorldRideSurface")
 ]
@@ -117,6 +126,7 @@ print(
         "initial_world": scene.get("arrietty_initial_world"),
         "ride_surfaces": len(ride_surfaces),
         "runway_z": round(runway_z, 6),
+        "ocean_z": round(ocean_z, 6),
     },
     flush=True,
 )

@@ -21,6 +21,17 @@ The root launcher checks SteamVR and residual Blender processes, opens the
 accepted `Arrietty-UP.blend` with the locally built UPBGE, starts persistent
 OpenXR, and enters the game. No manual `P` press is required.
 
+To paste RAM-only Google tiles before the game starts, use the same PowerShell
+session in which `SECRET_WORLD_GOOGLE_MAPS_API_KEY` was set:
+
+```powershell
+.\start.ps1 -WaitForGoogleTiles
+```
+
+The launcher starts OpenXR and remains in the UPBGE editor. Use
+`N > Secret World > Paste Google Tiles`; after the paste completes, the
+launcher enters the game automatically.
+
 ## Runtime boundary
 
 - `bpy` is used only by authoring/build/startup tools, never by the game-frame
@@ -88,13 +99,15 @@ in `../Secret-World`; Arrietty-UP keeps only the accepted runtime snapshot.
 
 ## Initial Tuvalu world
 
-`Tuval-1.blend` is an unchanged copy of
-`../Arrietty/test_data/Tuval-1.blend`. Its `Secret World` collection and
-Funafuti sky are appended to the UPBGE runtime scene. The derived scene shifts
-the 1.46 m runway elevation to Z=0, starts at its center facing along runway
-03-21, extends the camera range to 250 km, and tags five imported ground
-objects as ride surfaces. The original Blender 5.2 LTS source copy remains
-unchanged; only `Arrietty-UP.blend` is saved in UPBGE's Blender 5.3 format.
+`Tuval-1.blend` is the UPBGE test-world copy derived from
+`../Arrietty/test_data/Tuval-1.blend`. The reproducible
+`tools/lower_tuvalu_test_world.py` conversion places its runway at `Z=0` and
+sea level at `Z=-1.46 m`, matching Secret World's default Google tile offset.
+Its `Secret World` collection and Funafuti sky are appended without another
+vertical shift, start at the runway center facing along 03-21, extend the
+camera range to 250 km, and tag five imported ground objects as ride surfaces.
+The original Blender 5.2 LTS source under `../Arrietty/test_data` remains
+unchanged.
 
 Reinstall the copied world after a full scene rebuild with:
 

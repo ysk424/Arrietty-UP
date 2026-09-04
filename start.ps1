@@ -1,5 +1,6 @@
 param(
-    [string]$BlenderPath = "C:\Users\azoo\git\build_upbge_windows_Release_x64_vc17_Release\bin\blender.exe"
+    [string]$BlenderPath = "C:\Users\azoo\git\build_upbge_windows_Release_x64_vc17_Release\bin\blender.exe",
+    [switch]$WaitForGoogleTiles
 )
 
 $ErrorActionPreference = "Stop"
@@ -10,4 +11,11 @@ if (-not (Test-Path -LiteralPath $Launcher)) {
     throw "Arrietty launcher not found: $Launcher"
 }
 
-& $Launcher -BlenderPath $BlenderPath -BlendPath $BlendPath
+$LauncherArguments = @{
+    BlenderPath = $BlenderPath
+    BlendPath = $BlendPath
+}
+if ($WaitForGoogleTiles) {
+    $LauncherArguments.WaitForGoogleTiles = $true
+}
+& $Launcher @LauncherArguments
