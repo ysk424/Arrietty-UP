@@ -25,6 +25,9 @@ SOURCE_WORLD = "Secret World Funafuti Hero Sky"
 INSTALLED_COLLECTION = "ArriettyTuvalWorld"
 INSTALL_MARKER = "ArriettyTuvalInstall"
 INSTALL_PROPERTY = "arrietty_tuval_installed"
+VISUAL_ONLY_PROPERTY = "secret_world_visual_only"
+RUNTIME_COLLISION_PROPERTY = "secret_world_runtime_collision"
+RUNTIME_SHADOW_PROPERTY = "secret_world_runtime_cast_shadow"
 
 
 def _arguments() -> argparse.Namespace:
@@ -167,6 +170,9 @@ def install(source: Path, output: Path) -> dict:
         runway.get("secret_world_test_content_z_offset_m", -runway_elevation)
     )
 
+    no_collision_meshes = 0
+    static_ride_meshes = 0
+    shadow_disabled_meshes = 0
     for collection in _collection_tree(world_collection):
         collection[INSTALL_PROPERTY] = True
     for obj in imported_objects:
@@ -183,6 +189,21 @@ def install(source: Path, output: Path) -> dict:
             obj.location.z -= runway_elevation
         if obj.get("secret_world_ride_surface"):
             obj["SecretWorldRideSurface"] = True
+        if obj.type == "MESH":
+            visual_only = bool(obj.get(VISUAL_ONLY_PROPERTY, False))
+            collision_role = str(obj.get(RUNTIME_COLLISION_PROPERTY, ""))
+            if visual_only or collision_role == "none":
+                obj.game.physics_type = "NO_COLLISION"
+                no_collision_meshes += 1
+            elif obj.get("SecretWorldRideSurface"):
+                obj.game.physics_type = "STATIC"
+                static_ride_meshes += 1
+            cast_shadow = bool(
+                obj.get(RUNTIME_SHADOW_PROPERTY, not visual_only)
+            )
+            obj.visible_shadow = cast_shadow
+            if not cast_shadow:
+                shadow_disabled_meshes += 1
 
     marker = bpy.data.objects.new(INSTALL_MARKER, None)
     marker[INSTALL_PROPERTY] = True
@@ -190,6 +211,9 @@ def install(source: Path, output: Path) -> dict:
     marker["runway_elevation_offset_m"] = -runway_elevation
     marker["source_content_z_offset_m"] = source_content_z_offset
     marker["initial_heading_degrees"] = initial_heading
+    marker["runtime_no_collision_meshes"] = no_collision_meshes
+    marker["runtime_static_ride_meshes"] = static_ride_meshes
+    marker["runtime_shadow_disabled_meshes"] = shadow_disabled_meshes
     scene.collection.objects.link(marker)
 
     tuval_world[INSTALL_PROPERTY] = True
@@ -230,6 +254,9 @@ def install(source: Path, output: Path) -> dict:
         "source_content_z_offset_m": round(source_content_z_offset, 6),
         "initial_heading_degrees": round(initial_heading, 6),
         "camera_clip_end_m": camera.data.clip_end,
+        "no_collision_meshes": no_collision_meshes,
+        "static_ride_meshes": static_ride_meshes,
+        "shadow_disabled_meshes": shadow_disabled_meshes,
     }
 
 

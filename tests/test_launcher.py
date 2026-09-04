@@ -18,6 +18,16 @@ class LauncherTests(unittest.TestCase):
         self.assertIn('os.environ.get("ARRIETTY_PROJECT_ROOT"', bootstrap)
         self.assertIn("$env:ARRIETTY_PROJECT_ROOT = $ProjectRoot", launcher)
 
+    def test_world_installer_applies_runtime_render_and_collision_roles(self):
+        root = Path(__file__).parents[1]
+        installer = (root / "tools" / "install_tuval_world.py").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn('obj.game.physics_type = "NO_COLLISION"', installer)
+        self.assertIn('obj.game.physics_type = "STATIC"', installer)
+        self.assertIn("obj.visible_shadow = cast_shadow", installer)
+
     def test_reentrant_game_start_keeps_outer_timer_alive(self):
         registered = []
         fake_bpy = SimpleNamespace(

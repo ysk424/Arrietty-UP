@@ -78,6 +78,16 @@ loading `arrietty_up` and `.runtime` dependencies. The Tuvalu installer refreshe
 the embedded bootstrap whenever it prepares a game blend. This prevents an
 external blend directory from being mistaken for the Arrietty-UP project root.
 
+Secret World Runtime Converter v0.2.0 adds the `flight_v1` optimization
+contract. The installer maps visual-only world meshes to `NO_COLLISION`, keeps
+only the five ride surfaces as `STATIC`, and applies the converter's shadow
+roles. The accepted source remains untouched; generated integration blends are
+validated outside this repository. Build `20260904095413055` produced 59
+one-kilometre scenery chunks, 61 no-collision/no-shadow visual meshes, and six
+lightweight runtime materials. The Secret World converter now applies the
+island `SOLIDIFY` and rejects every remaining world modifier. OpenXR flight
+performance still requires a live HMD acceptance run.
+
 ## Live hardware result
 
 The focused fan run on 2026-09-03 was accepted as **PASS**.

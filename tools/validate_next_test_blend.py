@@ -75,6 +75,24 @@ if len(ride_surfaces) != 5:
     _fail(f"expected 5 Tuvalu ride surfaces, found {len(ride_surfaces)}")
 if scene.objects.get("SecretWorldRideSurface") is not None:
     _fail("placeholder ride plane was not removed")
+visual_only_meshes = [
+    obj
+    for obj in scene.objects
+    if obj.type == "MESH" and obj.get("secret_world_visual_only")
+]
+invalid_visual_physics = [
+    obj.name for obj in visual_only_meshes if obj.game.physics_type != "NO_COLLISION"
+]
+if invalid_visual_physics:
+    _fail(f"visual-only meshes still have collision: {invalid_visual_physics}")
+invalid_visual_shadows = [obj.name for obj in visual_only_meshes if obj.visible_shadow]
+if invalid_visual_shadows:
+    _fail(f"visual-only meshes still cast shadows: {invalid_visual_shadows}")
+invalid_ride_physics = [
+    obj.name for obj in ride_surfaces if obj.game.physics_type != "STATIC"
+]
+if invalid_ride_physics:
+    _fail(f"ride meshes are not static collision surfaces: {invalid_ride_physics}")
 
 elapsed = scene.objects["Instrument_ElapsedValue"]
 elapsed_property = next(
@@ -127,6 +145,8 @@ print(
         "ride_surfaces": len(ride_surfaces),
         "runway_z": round(runway_z, 6),
         "ocean_z": round(ocean_z, 6),
+        "visual_no_collision": len(visual_only_meshes),
+        "visual_shadow_disabled": len(visual_only_meshes),
     },
     flush=True,
 )
