@@ -19,7 +19,10 @@ Start SteamVR, power the bicycle equipment, and run this from PowerShell:
 
 The root launcher checks SteamVR and residual Blender processes, opens the
 accepted `Arrietty-UP.blend` with the locally built UPBGE, starts persistent
-OpenXR, and enters the game. No manual `P` press is required.
+OpenXR, and enters the game. No manual `P` press is required. It always uses
+UPBGE's OpenXR-capable Viewport Render path and selects Rendered shading before
+the XR session starts. For a lower-load diagnostic run, use
+`.\start.ps1 -Shading Solid`.
 
 To paste RAM-only Google tiles before the game starts, use the same PowerShell
 session in which `SECRET_WORLD_GOOGLE_MAPS_API_KEY` was set:
@@ -58,6 +61,9 @@ speed-driven fan levels have also passed a live run.
 
 The game begins preparing and maintaining T2 as soon as its first UPBGE frame
 runs; Button 1 aligns the HMD and centered VIVE handle, then arms movement.
+If a Rendered scene takes time to publish its first valid HMD pose, alignment
+keeps waiting instead of expiring after one second. The debug panel reports
+`HMD WAIT` until alignment succeeds and `HMD OK` afterwards.
 Pedalling during preparation does not move the HMD or raise the fan level. The T2 worker uses the
 installation's known address
 `F8:10:89:93:10:C8`, with advertisement scanning as a fallback. It subscribes

@@ -1,6 +1,8 @@
 param(
     [string]$BlenderPath = "C:\Users\azoo\git\build_upbge_windows_Release_x64_vc17_Release\bin\blender.exe",
     [string]$BlendPath = "C:\Users\azoo\git\Arrietty-UP\Arrietty-UP.blend",
+    [ValidateSet("Rendered", "Solid")]
+    [string]$Shading = "Rendered",
     [switch]$WaitForGoogleTiles
 )
 
@@ -28,9 +30,11 @@ $Stdout = Join-Path $env:TEMP "arrietty-live-$Stamp.out.log"
 $Stderr = Join-Path $env:TEMP "arrietty-live-$Stamp.err.log"
 $PreviousWaitForTiles = $env:ARRIETTY_WAIT_FOR_GOOGLE_TILES
 $PreviousProjectRoot = $env:ARRIETTY_PROJECT_ROOT
+$PreviousXrShading = $env:ARRIETTY_XR_SHADING
 try {
     $env:ARRIETTY_WAIT_FOR_GOOGLE_TILES = if ($WaitForGoogleTiles) { "1" } else { "0" }
     $env:ARRIETTY_PROJECT_ROOT = $ProjectRoot
+    $env:ARRIETTY_XR_SHADING = $Shading.ToUpperInvariant()
     $Process = Start-Process `
         -FilePath $BlenderPath `
         -ArgumentList @("--online-mode", "--start-console", $BlendPath, "--python", $StartupScript) `
@@ -51,6 +55,12 @@ finally {
     else {
         $env:ARRIETTY_PROJECT_ROOT = $PreviousProjectRoot
     }
+    if ($null -eq $PreviousXrShading) {
+        Remove-Item Env:\ARRIETTY_XR_SHADING -ErrorAction SilentlyContinue
+    }
+    else {
+        $env:ARRIETTY_XR_SHADING = $PreviousXrShading
+    }
 }
 
 [pscustomobject]@{
@@ -58,5 +68,6 @@ finally {
     Project = $ProjectRoot
     StandardOutput = $Stdout
     StandardError = $Stderr
+    Shading = $Shading
     WaitForGoogleTiles = [bool]$WaitForGoogleTiles
 } | Format-List

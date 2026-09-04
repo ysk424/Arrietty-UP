@@ -1,5 +1,7 @@
 param(
     [string]$BlenderPath = "C:\Users\azoo\git\build_upbge_windows_Release_x64_vc17_Release\bin\blender.exe",
+    [ValidateSet("Rendered", "Solid")]
+    [string]$Shading = "Rendered",
     [switch]$WaitForGoogleTiles
 )
 
@@ -14,6 +16,7 @@ if (-not (Test-Path -LiteralPath $Launcher)) {
 $LauncherArguments = @{
     BlenderPath = $BlenderPath
     BlendPath = $BlendPath
+    Shading = $Shading
 }
 if ($WaitForGoogleTiles) {
     $LauncherArguments.WaitForGoogleTiles = $true

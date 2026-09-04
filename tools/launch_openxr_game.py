@@ -19,7 +19,16 @@ _game_start_requested = False
 _wait_for_google_tiles = os.environ.get(
     "ARRIETTY_WAIT_FOR_GOOGLE_TILES", "0"
 ).strip() == "1"
+_requested_shading = os.environ.get(
+    "ARRIETTY_XR_SHADING", "RENDERED"
+).strip().upper()
+if _requested_shading not in {"SOLID", "RENDERED"}:
+    raise RuntimeError(
+        "ARRIETTY_XR_SHADING must be RENDERED or SOLID, "
+        f"not {_requested_shading!r}"
+    )
 _google_wait_announced = False
+_render_mode_announced = False
 
 
 def _google_tiles_ready():
@@ -45,6 +54,27 @@ def _view3d_context():
     return None
 
 
+def _configure_render_mode(area):
+    """Select the OpenXR-capable UPBGE path before either session starts."""
+    global _render_mode_announced
+
+    scene = bpy.context.scene
+    scene.game_settings.use_viewport_render = True
+    area.spaces.active.shading.type = _requested_shading
+    xr_shading = bpy.context.window_manager.xr_session_settings.shading
+    xr_shading.type = _requested_shading
+    if _requested_shading == "RENDERED":
+        xr_shading.use_scene_lights_render = True
+        xr_shading.use_scene_world_render = True
+    if not _render_mode_announced:
+        print(
+            "ARRIETTY_RENDER_MODE "
+            f"game=VIEWPORT shading={_requested_shading}",
+            flush=True,
+        )
+        _render_mode_announced = True
+
+
 def _start_openxr_then_game():
     global _attempt, _xr_start_requested, _xr_ready_announced
     global _game_start_requested, _google_wait_announced
@@ -65,6 +95,7 @@ def _start_openxr_then_game():
         return 0.5
 
     window, screen, area, region = context
+    _configure_render_mode(area)
     xr_state = bpy.context.window_manager.xr_session_state
     xr_running = xr_state is not None and xr_state.is_running(bpy.context)
     if not xr_running:

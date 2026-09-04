@@ -407,6 +407,7 @@ class RuntimeStateTests(unittest.TestCase):
     def test_cpp_openxr_bridge_sync_alignment_and_reset(self):
         state = self.make_state()
         state.hmd_alignment_degrees = -12.5
+        state.ride_active = True
         owner = object()
         logic = FakeOpenXRLogic()
 
@@ -415,11 +416,37 @@ class RuntimeStateTests(unittest.TestCase):
         self.assertTrue(state.xr_navigation_synced)
         self.assertEqual(state.xr_bridge_status, "SYNCED")
 
-        state.hmd_alignment_pending_until_seconds = 2.0
-        self.assertTrue(_try_align_hmd_to_bike(state, 1.0, logic))
+        self.assertTrue(_try_align_hmd_to_bike(state, 1000.0, logic))
         self.assertAlmostEqual(state.hmd_alignment_degrees, -90.0)
         self.assertTrue(_reset_xr_navigation(logic))
         self.assertEqual(logic.reset_count, 1)
+
+    def test_hmd_alignment_waits_for_a_valid_rendered_pose(self):
+        class DelayedOpenXRLogic(FakeOpenXRLogic):
+            def __init__(self):
+                super().__init__()
+                self.pose_ready = False
+
+            def getOpenXRViewerRotation(self):
+                return (
+                    super().getOpenXRViewerRotation()
+                    if self.pose_ready
+                    else None
+                )
+
+        state = self.make_state()
+        state.ride_active = True
+        logic = DelayedOpenXRLogic()
+
+        self.assertFalse(_try_align_hmd_to_bike(state, 1.0, logic))
+        self.assertEqual(
+            state.hmd_alignment_message,
+            "WAITING FOR VALID OPENXR HMD POSE",
+        )
+
+        logic.pose_ready = True
+        self.assertTrue(_try_align_hmd_to_bike(state, 10.0, logic))
+        self.assertTrue(state.hmd_aligned)
 
 
 if __name__ == "__main__":

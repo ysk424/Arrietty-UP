@@ -13,6 +13,8 @@ def _fail(message: str) -> None:
 
 
 scene = bpy.context.scene
+if not scene.game_settings.use_viewport_render:
+    _fail("OpenXR requires UPBGE Viewport Render mode")
 if scene.get("instrument_panel_version") != 4:
     _fail("instrument panel version is not 4")
 required_objects = (
@@ -147,6 +149,7 @@ print(
         "ocean_z": round(ocean_z, 6),
         "visual_no_collision": len(visual_only_meshes),
         "visual_shadow_disabled": len(visual_only_meshes),
+        "game_viewport_render": True,
     },
     flush=True,
 )

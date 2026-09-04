@@ -89,7 +89,6 @@ class RuntimeState:
     last_start_action: str = "IDLE"
     hmd_aligned: bool = False
     hmd_alignment_degrees: float = 0.0
-    hmd_alignment_pending_until_seconds: float = 0.0
     hmd_alignment_message: str = "WAITING FOR BUTTON 1"
     xr_bridge_status: str = "NOT CHECKED"
     xr_navigation_synced: bool = False
@@ -167,9 +166,6 @@ class RuntimeState:
         self.ride_started_at_seconds = time.monotonic()
         self.ride_elapsed_seconds = 0.0
         self.hmd_aligned = False
-        self.hmd_alignment_pending_until_seconds = (
-            self.ride_started_at_seconds + 1.0
-        )
         self.hmd_alignment_message = "ALIGNING HMD TO BICYCLE FORWARD"
         self.first_motion_after_seconds = 0.0
         if self.brake_button_held and self.bluetooth.running:
@@ -704,7 +700,10 @@ def _quaternion_z_rotation_degrees(rotation) -> float:
 
 
 def _try_align_hmd_to_bike(runtime: RuntimeState, now: float, logic) -> bool:
-    if runtime.hmd_aligned or now > runtime.hmd_alignment_pending_until_seconds:
+    # Rendered OpenXR scenes can take longer than a second to publish their
+    # first valid viewer pose. Keep trying after Button 1 instead of silently
+    # leaving all ground and flight movement locked behind a missed deadline.
+    if runtime.hmd_aligned or not runtime.ride_active:
         return runtime.hmd_aligned
     try:
         viewer_rotation = logic.getOpenXRViewerRotation()

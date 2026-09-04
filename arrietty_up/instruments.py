@@ -119,7 +119,10 @@ def build_readout(runtime, delta_seconds: float) -> InstrumentReadout:
                 f"{runtime.fan.short_status}"
             ),
             f"VOICE {getattr(runtime, 'voice_status', 'IDLE')}",
-            f"XR {getattr(runtime, 'xr_bridge_status', 'UNKNOWN')}",
+            (
+                f"XR {getattr(runtime, 'xr_bridge_status', 'UNKNOWN')} "
+                f"HMD {'OK' if getattr(runtime, 'hmd_aligned', False) else 'WAIT'}"
+            ),
             f"FRAME {max(0.0, delta_seconds) * 1000.0:4.1f} ms",
         )
     )

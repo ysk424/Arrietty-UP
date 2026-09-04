@@ -51,7 +51,7 @@ scope here.
 
 ## Working baseline
 
-- Arrietty-UP version: `0.13.1-up.8`
+- Arrietty-UP version: `0.13.1-up.9`
 - Public repository: https://github.com/ysk424/Arrietty-UP
 - Accepted working baseline: current `main` HEAD
 - Standard Blender: locally built Blender 5.2.0 LTS
@@ -70,6 +70,10 @@ no `P` press is required. `Esc` leaves the game. The startup timer deliberately
 remains registered during the nested game loop, preventing the prior
 `BLI_timer_execute` access violation after returning to Blender. A darker
 rectangular game border while running is expected.
+The launcher now forces the required UPBGE Viewport Render path and selects
+Rendered shading before starting OpenXR; `-Shading Solid` is the low-load
+fallback. Button 1 keeps retrying HMD alignment until a valid rendered pose is
+available, and the panel shows `HMD WAIT` or `HMD OK` beside XR status.
 
 Generated Secret World integration blends may live outside this repository.
 `tools/launch_live_test.ps1` now passes `ARRIETTY_PROJECT_ROOT` only to the

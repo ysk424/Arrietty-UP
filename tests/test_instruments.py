@@ -36,6 +36,7 @@ class InstrumentTests(unittest.TestCase):
         self.assertIn("STR IDLE +0.0", panel.debug)
         self.assertIn("CMD P+0 R+0", panel.debug)
         self.assertIn("FAN 0/-- WAIT", panel.debug)
+        self.assertIn("XR NOT CHECKED HMD WAIT", panel.debug)
         self.assertIn("FRAME 16.7 ms", panel.debug)
 
     def test_unavailable_grade_and_heart_rate_are_not_shown_as_zero(self):
