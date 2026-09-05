@@ -2,6 +2,35 @@
 
 Last updated: 2026-09-05 (Asia/Tokyo)
 
+## New preflight local-time workflow (2026-09-05)
+
+The user approved replacing automatic game start with editor waiting:
+OpenXR starts, `N > Arrietty` opens, local date/time is applied, then P starts
+play and Esc returns to setup. `tools/world_setup_ui.py` owns only editor UI
+and lifecycle; `../Secret-World/solar.py` owns astronomy/sky/Sun/disc. The
+Secret World launcher passes `SECRET_WORLD_SOLAR_MODULE`. World time remains
+fixed in play; no `bpy` or time-of-day work was added to `arrietty_up`.
+
+The default prepared solar scene uses 2026-09-05 17:45 Tuvalu time (UTC+12).
+Inputs are date YYYY-MM-DD and time HH:MM. Press **日時を適用** before P;
+unapplied edits block the custom start operator. **ゲーム開始（P）** is also
+available. Esc keeps OpenXR running and restores the applied sky for editing.
+Standalone `start.ps1` also waits for P, but the solar adapter requires the
+integrated Secret World launcher. The startup timer ends before manual play,
+so it no longer spans the nested game loop.
+
+Validation: `python -m unittest discover -s tests` passed 75 tests, including
+the new no-autostart assertion and unchanged no-bpy runtime boundary.
+`../Secret-World/tests/upbge_world_setup.py` passed in headless UPBGE.
+A live OpenXR lifecycle probe entered the game, inspected the Sun on a game
+frame, ended after 90 frames, and returned to usable setup with OpenXR still
+running. The probe temporarily replaced the game tick, so this was not a
+hardware flight test. Original `arrietty_bootstrap.tick` was restored and the
+probe text removed. User HMD/flight acceptance remains pending.
+
+The historical automatic-start descriptions below refer to the earlier
+accepted baseline; use the workflow above for current builds.
+
 The panel, compiled C++ OpenXR bridge, PFD, human-powered flight controls, and
 physical fan were accepted in live tests on 2026-09-03. The Arrietty-UP
 simulator milestone is complete. Scenery work now moves to `../Secret-World`.

@@ -19,7 +19,8 @@ Start SteamVR, power the bicycle equipment, and run this from PowerShell:
 
 The root launcher checks SteamVR and residual Blender processes, opens the
 accepted `Arrietty-UP.blend` with the locally built UPBGE, starts persistent
-OpenXR, and enters the game. No manual `P` press is required. It always uses
+OpenXR, and waits in the editor. Press `P` over the 3D View to enter the game;
+`Esc` returns to setup. It always uses
 UPBGE's OpenXR-capable Viewport Render path and selects Rendered shading before
 the XR session starts. For a lower-load diagnostic run, use
 `.\start.ps1 -Shading Solid`.
@@ -33,7 +34,20 @@ session in which `SECRET_WORLD_GOOGLE_MAPS_API_KEY` was set:
 
 The launcher starts OpenXR and remains in the UPBGE editor. Use
 `N > Secret World > Paste Google Tiles`; after the paste completes, the
-launcher enters the game automatically.
+press `P` to enter the game.
+
+For the current island and local-time controls, launch
+`../Secret-World/start_arrietty_up.ps1`. The `N > Arrietty` panel opens
+automatically. Enter a date (`YYYY-MM-DD`) and Tuvalu local time (`HH:MM`,
+UTC+12), click **日時を適用**, then press **P** or **ゲーム開始（P）**.
+Changing input without applying it prevents accidental start with the old time.
+The selected world time stays fixed during play. After **Esc**, the same
+settings can be edited and applied again. The normal Button 1 flight alignment
+and arming sequence still applies after entering the game.
+
+The editor-only adapter is `tools/world_setup_ui.py`. It loads the world-owned
+solar module from `SECRET_WORLD_SOLAR_MODULE`, supplied by the Secret World
+launcher. No solar or `bpy` work was added to the per-frame game package.
 
 ## Runtime boundary
 
@@ -53,8 +67,8 @@ launcher enters the game automatically.
 ## Current milestone
 
 The locally built UPBGE 0.53/OpenXR path has been verified in an HMD. The
-`tools/launch_openxr_game.py` startup helper starts persistent OpenXR before
-entering the game once; returning with `Esc` works after restoring the View3D
+`tools/launch_openxr_game.py` startup helper starts persistent OpenXR and waits
+for `P`; returning with `Esc` works after restoring the View3D
 context following XR notifier handling in the local UPBGE source tree. T2
 speed-driven OpenXR navigation, Garmin heart rate, the wired controller, and
 speed-driven fan levels have also passed a live run.

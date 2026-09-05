@@ -79,7 +79,7 @@ class LauncherTests(unittest.TestCase):
         self.assertIn('obj.game.physics_type = "STATIC"', installer)
         self.assertIn("obj.visible_shadow = cast_shadow", installer)
 
-    def test_reentrant_game_start_keeps_outer_timer_alive(self):
+    def test_ready_xr_waits_and_unregisters_timer_without_entering_game(self):
         registered = []
         fake_bpy = SimpleNamespace(
             app=SimpleNamespace(
@@ -94,8 +94,15 @@ class LauncherTests(unittest.TestCase):
             globals_ = runpy.run_path(str(launcher))
 
         self.assertEqual(len(registered), 1)
-        registered[0].__globals__["_game_start_requested"] = True
-        self.assertGreater(registered[0](), 0.0)
+        state=registered[0].__globals__
+        state['_setup_ready']=True
+        state['_wait_for_google_tiles']=False
+        state['_view3d_context']=lambda: (None,None,None,None)
+        state['_configure_render_mode']=lambda area: None
+        fake_bpy.context=SimpleNamespace(window_manager=SimpleNamespace(
+            xr_session_state=SimpleNamespace(is_running=lambda context: True)))
+        # No bpy.ops exists in this stub: any attempted automatic game start fails.
+        self.assertIsNone(registered[0]())
 
     def test_google_tile_wait_mode_detects_live_objects(self):
         registered = []
