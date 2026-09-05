@@ -1,6 +1,93 @@
 # Next session handoff
 
-Last updated: 2026-09-05 (Asia/Tokyo)
+Last updated: 2026-09-06 (Asia/Tokyo)
+
+## Final replay acceptance and delivery (2026-09-06)
+
+The user accepted the correction (修正OK), set the chase camera to local
+(0,-7,1.2)m, and stated that corrections are finished. They explicitly
+requested saved documentation and PUSH. The final editor scene is preserved
+locally at `../Arrietty-trajectory/work/Accepted-Replay-20260906.blend` and was
+independently reopened. Source/docs/tests/Windows build recipes are included
+in the delivery of both repositories; CSVs, FBX and generated/user scenes
+remain local and ignored. Resume replay work only on a new user request.
+The runtime bank-sign source correction remains effective on the next fresh
+UPBGE process; replay acceptance is not an additional HMD flight test.
+
+## Roll display sign correction after user review (2026-09-06)
+
+The user correctly observed the outside wing dropping during turns in replay.
+The flight calculation and CSV roll sign were correct, but both UP's
+`_vehicle_orientation` and the replay transform displayed bank backwards.
+With UP forward -Y, positive internal bank means left turn, and local +X is
+the left wing. The Y-axis bank quaternion must therefore use positive
+`flight.bank_degrees`, not its negative. Replay now uses positive CSV roll
+around +Y to lower local +X/right wing. Pitch/yaw, flight physics, controls,
+logger fields and existing CSVs are unchanged.
+
+The earlier matrix-equality check reproduced the same sign error at both ends;
+it was insufficient evidence of correct bank direction. Expanded
+`../Arrietty-trajectory/tests/blender_attitude.py` now tests zero-rudder turns
+from the flight model and directly asserts the inside wing lowers, then checks
+positive CSV roll lowers the right wing and positive pitch raises the nose in
+the reopened production replay. It passed in standard Blender. All 78 UP and
+16 trajectory unit tests passed. Runtime source correction takes effect on
+the next fresh UPBGE process; no running game was interrupted and no source
+blend or executable was rewritten. HMD visual verification of this corrected
+bank display remains pending a future normal flight, separate from offline
+validation. The already recorded log is sufficient for the corrected replay.
+
+## Hardware attitude log verified (2026-09-06 05:49–05:54 JST)
+
+The user recorded a new flight, reported no procedure problem and successful
+HMD initialization. CSV persistence now passes on hardware: 2,420 complete
+rows / 268.093s including waiting; 1,616 ride samples / 179.777s after trimming.
+Pitch -11..+4 degrees, roll -17..+12 degrees, max altitude 24.740m; median
+interval 0.111s, maximum 0.129s. Runtime stopped and returned to setup cleanly;
+no flight-log error or stop timeout found. CSV does not persist the drop
+counter, so cadence alone is not proof of exactly zero dropped samples.
+
+Trajectory preserved the log unchanged as
+`../Arrietty-trajectory/build/flight-20260906-054953-attitude.csv`, SHA-256
+`147b1d63ead32129cd432c87d84ae976a891cba590e0923c2ad47ec0d23d6525`.
+Its standard-Blender replay passed build/reopen checks and all 1,616 recorded
+attitudes matched saved transforms (max matrix element error 4.47035e-7).
+Actual left/right bank and pitch-up/down renders were inspected. The new
+replay is `../Arrietty-trajectory/work/Recorded-Replay-20260906-054953.blend`.
+User visual verdict is pending there; no further hardware recording is needed
+for basic pitch/roll coverage. The original latest CSV was never edited by
+the replay task, and a future P may now replace it because the snapshot exists.
+
+## Attitude telemetry ready for hardware recording (2026-09-06)
+
+At the user's request from Arrietty-trajectory, `flight_log.py` now appends
+`pitch_deg` (nose up positive), `roll_deg` (right wing down positive), sampled
+at most 10Hz instead of 1Hz. Values match `_vehicle_orientation`: actual flight
+pitch and negative internal bank while airborne, zero on ground. Control
+targets/HMD pose are not logged as vehicle attitude. Metadata columns and final
+forced sample remain intact; no game-thread disk I/O or bpy import was added.
+Old latest-flight.csv was preserved, hash remains
+`aa308362845d2a6292669a7f0b119bd60ed3b195572cfdf88e5509d60170438d`.
+
+Validation: `python -m unittest discover -s tests -v` passed all 78 tests.
+From `../Arrietty-trajectory`, standard Blender ran
+`tests/blender_attitude.py` and printed `LOGGER_ATTITUDE_READBACK_OK`: actual
+logger -> CSV parser -> production replay builder -> saved-file read-back
+matches `_vehicle_orientation` after forward-axis conversion. Cases cover both
+banks, pitch signs, north crossing and ground leveling. This uses a unit
+fixture without connecting hardware; actual new hardware recording is pending.
+
+Next: launch a fresh process via `../Secret-World/start_arrietty_up.ps1`, use
+normal preflight/P/Button 1 sequence, record 2-3 minutes with pitch and banks,
+Esc to finish, then let trajectory snapshot the log before another P session.
+No UPBGE executable rebuild or source blend update is needed.
+
+`../Arrietty-UP-work` was obsolete distribution/probe storage (2,428,633,295
+bytes), with no current launcher/CMake dependency found. It was moved to the
+Windows Recycle Bin at the user's request. The three useful Windows CMake
+recipes were preserved byte-for-byte under `tools/windows/` before removal.
+Current installed UPBGE, source checkout, dependencies and device setup remain
+in their existing locations.
 
 ## Latest-session route log (2026-09-05)
 

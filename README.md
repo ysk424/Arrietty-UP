@@ -9,7 +9,7 @@ steering, wired ESP32 control panel, ESP32 fan, instrument, ride log, and
 voice-PTT behavior. Cesium is not part of this repository; geographic world
 streaming belongs to `../Secret-World`.
 
-Flight routes are saved once per second to `logs/latest-flight.csv`. Each new
+Flight routes and applied pitch/roll are saved about every 0.1 seconds to `logs/latest-flight.csv`. Each new
 P game session replaces the previous route; Esc saves the final position.
 See [flight-log details](docs/FLIGHT_LOG.md). Launcher console logs also use
 fixed names in `logs/` and are replaced on each UPBGE process launch.

@@ -707,7 +707,9 @@ def _vehicle_orientation(runtime: RuntimeState):
         (1.0, 0.0, 0.0), math.radians(-runtime.flight.pitch_degrees)
     )
     bank = Quaternion(
-        (0.0, 1.0, 0.0), math.radians(-runtime.flight.bank_degrees)
+        # Local forward is -Y, so the left wing is +X. Positive internal
+        # bank turns left and must lower +X, which requires positive Y rotation.
+        (0.0, 1.0, 0.0), math.radians(runtime.flight.bank_degrees)
     )
     return (heading @ pitch @ bank).to_matrix()
 

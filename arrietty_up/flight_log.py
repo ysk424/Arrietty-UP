@@ -16,7 +16,10 @@ FIELDS = (
     "altitude_m", "bearing_deg", "speed_kmh", "ride_active", "flight_enabled",
     "airborne", "distance_m", "world_file", "world_local_time",
     "origin_latitude", "origin_longitude",
+    "pitch_deg", "roll_deg",
 )
+METADATA_FIELDS = ("world_file", "world_local_time", "origin_latitude", "origin_longitude")
+SAMPLE_INTERVAL_SECONDS = 0.1
 
 
 class FlightLog:
@@ -45,7 +48,7 @@ class FlightLog:
     def sample(self, state, now: float, *, force: bool = False) -> None:
         if self.error or self._stop.is_set() or (not force and now < self._next_sample):
             return
-        self._next_sample = now + 1.0
+        self._next_sample = now + SAMPLE_INTERVAL_SECONDS
         row = {
             "recorded_utc": datetime.now(timezone.utc).isoformat(timespec="milliseconds"),
             "session_seconds": round(max(0.0, now - state.started_at), 3),
@@ -54,13 +57,17 @@ class FlightLog:
             "north_m": round(state.position_y_meters, 3),
             "altitude_m": round(state.flight.altitude_meters, 3),
             "bearing_deg": round(state.navigation_heading_degrees, 3),
+            # Match the applied vehicle pose: the runtime levels it on ground.
+            # Its internal bank is left-positive; CSV roll is right-wing-down.
+            "pitch_deg": round(state.flight.pitch_degrees, 3) if state.flight.airborne else 0.0,
+            "roll_deg": round(-state.flight.bank_degrees, 3) if state.flight.airborne else 0.0,
             "speed_kmh": round(state.speed_kmh, 3),
             "ride_active": int(state.ride_active),
             "flight_enabled": int(state.flight_enabled),
             "airborne": int(state.flight.airborne),
             "distance_m": round(state.distance_meters, 3),
         }
-        for key in FIELDS[12:]:
+        for key in METADATA_FIELDS:
             row[key] = self.metadata.get(key, "")
         try:
             self._queue.put_nowait(row)
