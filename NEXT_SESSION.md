@@ -42,6 +42,13 @@ source/log were not modified by the replay project. Continue animation work
 in `../Arrietty-trajectory/docs/PROJECT_STATE.md`; this repository retains
 ownership of live flight telemetry and equipment.
 
+End of 2026-09-05: the user marked the standard-Blender replay **合格** and
+will return the following morning. Arrietty-trajectory saved the accepted
+editor state in `work/Accepted-Replay-20260905.blend`, verified read-back, and
+closed Blender. Continue from its `docs/PROJECT_STATE.md` and open that saved
+work file. No new live flight or UPBGE startup is needed to replay it. Logging
+and device ownership remain here; model/camera animation belongs there.
+
 ## New preflight local-time workflow (2026-09-05)
 
 The user approved replacing automatic game start with editor waiting:
