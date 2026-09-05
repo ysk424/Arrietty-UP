@@ -21,6 +21,7 @@ from .controls import (
 from .controller_protocol import ButtonEdgeLatch, ButtonTransition, ControllerSample
 from .flight import initialize_human_powered_flight, step_human_powered_flight
 from .fan import FanController
+from .flight_log import FlightLog
 from .instruments import update_upbge_panel
 from .models import CscSample, FlightState
 from .serial_controller import ControllerEventType, SerialController
@@ -119,6 +120,7 @@ class RuntimeState:
     ptt_held: bool = False
     voice_status: str = "IDLE"
     ending: bool = False
+    flight_log: FlightLog | None = None
 
     def prepare_devices(self) -> bool:
         if self.bluetooth.running:
@@ -609,6 +611,11 @@ class RuntimeState:
         )
 
     def stop_services(self) -> None:
+        if self.flight_log is not None:
+            self.flight_log.sample(self, time.monotonic(), force=True)
+            if not self.flight_log.close():
+                print("ARRIETTY_FLIGHT_LOG_STOP_TIMEOUT", flush=True)
+            self.flight_log = None
         if not self.bluetooth.stop():
             print("ARRIETTY_BLUETOOTH_STOP_TIMEOUT", flush=True)
         self.ride_active = False
@@ -806,6 +813,7 @@ def tick(controller) -> None:
             runtime.position_y_meters = 0.0
         runtime.start_position_x_meters = runtime.position_x_meters
         runtime.start_position_y_meters = runtime.position_y_meters
+        runtime.flight_log = FlightLog.for_session()
         owner["arrietty_status"] = "RUNNING"
         owner["arrietty_version"] = c.VERSION
         owner["controller_status"] = "STARTING"
@@ -1001,6 +1009,10 @@ def tick(controller) -> None:
     )
     owner.worldOrientation = _vehicle_orientation(runtime)
     _update_navigation(runtime)
+    if runtime.flight_log is not None:
+        runtime.flight_log.sample(runtime, now)
+        owner["flight_log_status"] = runtime.flight_log.error or "RECORDING"
+        owner["flight_log_dropped_samples"] = runtime.flight_log.dropped_samples
     _sync_xr_navigation(runtime, owner, bge.logic)
     owner["xr_bridge_status"] = runtime.xr_bridge_status
     owner["navigation_heading_degrees"] = runtime.navigation_heading_degrees

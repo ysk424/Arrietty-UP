@@ -25,9 +25,10 @@ if (-not (Test-Path -LiteralPath $BlendPath)) {
     throw "Project blend not found: $BlendPath"
 }
 
-$Stamp = Get-Date -Format "yyyyMMdd-HHmmss"
-$Stdout = Join-Path $env:TEMP "arrietty-live-$Stamp.out.log"
-$Stderr = Join-Path $env:TEMP "arrietty-live-$Stamp.err.log"
+$LogDirectory = Join-Path $ProjectRoot "logs"
+New-Item -ItemType Directory -Path $LogDirectory -Force | Out-Null
+$Stdout = Join-Path $LogDirectory "latest-console.out.log"
+$Stderr = Join-Path $LogDirectory "latest-console.err.log"
 $PreviousWaitForTiles = $env:ARRIETTY_WAIT_FOR_GOOGLE_TILES
 $PreviousProjectRoot = $env:ARRIETTY_PROJECT_ROOT
 $PreviousXrShading = $env:ARRIETTY_XR_SHADING

@@ -1,5 +1,6 @@
 """Editor-only preflight UI. Never imported by the game-frame package."""
 import importlib.util
+import json
 import os
 from pathlib import Path
 import sys
@@ -102,6 +103,13 @@ class ARRIETTY_PT_world_setup(bpy.types.Panel):
 @persistent
 def game_pre(_scene=None):
     global _playing
+    scene = bpy.context.scene
+    os.environ['ARRIETTY_FLIGHT_METADATA'] = json.dumps({
+        'world_file': bpy.data.filepath,
+        'world_local_time': scene.get('secret_world_solar_local', ''),
+        'origin_latitude': scene.get('secret_world_origin_latitude_exact', ''),
+        'origin_longitude': scene.get('secret_world_origin_longitude_exact', ''),
+    })
     _playing = True
     print('ARRIETTY_GAME_ENTERED',flush=True)
 
@@ -110,6 +118,9 @@ def game_pre(_scene=None):
 def game_post(_scene=None):
     global _playing
     _playing = False
+    runtime = sys.modules.get('arrietty_up.runtime')
+    if runtime is not None:
+        runtime.shutdown()
     # Game teardown restores editor datablocks. Reapply once after teardown.
     bpy.app.timers.register(restore_preview,first_interval=.25)
 

@@ -2,6 +2,33 @@
 
 Last updated: 2026-09-05 (Asia/Tokyo)
 
+## Latest-session route log (2026-09-05)
+
+The user accepted the solar/preflight workflow as **PASS**, then requested a
+flight route log that overwrites previous runs. Implemented
+`arrietty_up/flight_log.py`: `logs/latest-flight.csv`, one sample per second
+plus the final position, replaced on the first frame of each P game session.
+Button 1 does not truncate it. CSV contains ENU position, simulator altitude,
+bearing/speed/state, actual UTC and editor-exported world/local-time/origin
+metadata. A bounded background queue keeps disk writes off the game thread.
+Esc and editor game_post close the writer. No bpy imports were added to runtime.
+See `docs/FLIGHT_LOG.md` for exact columns, retention and failure behavior.
+
+Previously there were diagnostics and an in-memory recovery trail, but no
+persistent route, so the accepted flight has no recoverable route CSV.
+Launcher diagnostics now use fixed `logs/latest-console.out.log` and
+`logs/latest-console.err.log`; older timestamped TEMP logs were not deleted.
+These changes take effect on the next normal UPBGE launch; the currently
+accepted session was not restarted. Tests: 78 unittest cases pass;
+Secret World's `tests/upbge_world_setup.py` passes including metadata export.
+Hardware flight-log acceptance is pending the next actual flight.
+
+The user requested documentation and PUSH before starting a separate route
+project. Suggested repository name: `Arrietty-trajectory`, preferred over
+`Arrietty-path` for actual time/altitude-bearing flight history. Naming remains
+unconfirmed; no new repository was created here. The CSV above is the input
+contract available for that future project; visualization scope is not yet set.
+
 ## New preflight local-time workflow (2026-09-05)
 
 The user approved replacing automatic game start with editor waiting:
@@ -26,7 +53,9 @@ A live OpenXR lifecycle probe entered the game, inspected the Sun on a game
 frame, ended after 90 frames, and returned to usable setup with OpenXR still
 running. The probe temporarily replaced the game tick, so this was not a
 hardware flight test. Original `arrietty_bootstrap.tick` was restored and the
-probe text removed. User HMD/flight acceptance remains pending.
+probe text removed. The user subsequently reported **PASS** on 2026-09-05;
+the fixed-time sun and preflight workflow are accepted. No numeric FPS result
+was supplied. The accepted Secret World Runtime is `20260905102318005`.
 
 The historical automatic-start descriptions below refer to the earlier
 accepted baseline; use the workflow above for current builds.
@@ -231,7 +260,7 @@ Run Blender-independent tests with:
 python3 -m unittest discover -s tests -v
 ```
 
-The current build has 75 passing tests, including a source-boundary
+The current build has 78 passing tests, including a source-boundary
 test that rejects any `bpy` import under `arrietty_up`, panel formatting, PFD
 attitude transforms, button chord handling, VIVE steering math, voice protocol,
 HMD alignment math, pre-takeoff aileron feedback, and the connected flight
