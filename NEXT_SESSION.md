@@ -29,6 +29,19 @@ project. Suggested repository name: `Arrietty-trajectory`, preferred over
 unconfirmed; no new repository was created here. The CSV above is the input
 contract available for that future project; visualization scope is not yet set.
 
+Update after the user's next flight: the separate repository is now
+`https://github.com/ysk424/Arrietty-trajectory` (private), authorized by the user.
+Its first scope is standard-Blender replay with a thin plate and chase camera.
+The actual latest CSV was read and copied to that project's ignored
+`build/accepted-flight.csv`; SHA-256
+`aa308362845d2a6292669a7f0b119bd60ed3b195572cfdf88e5509d60170438d`.
+163 post-start samples span 163.677 seconds, reach 32.717 m altitude and end
+at logged distance 1042.478 m. The final forced point and clean runtime exit
+are present, so first-flight CSV persistence is now verified. Arrietty-UP
+source/log were not modified by the replay project. Continue animation work
+in `../Arrietty-trajectory/docs/PROJECT_STATE.md`; this repository retains
+ownership of live flight telemetry and equipment.
+
 ## New preflight local-time workflow (2026-09-05)
 
 The user approved replacing automatic game start with editor waiting:
